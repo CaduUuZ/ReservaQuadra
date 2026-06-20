@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "seed": "tsx prisma/seed.ts",
+    "loadtest": "tsx scripts/load-test.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

@@ -43,7 +43,15 @@ function isForeignKeyViolation(error: unknown): boolean {
 
 export async function createBooking(input: CreateBookingInput) {
   try {
-    return await prisma.booking.create({ data: input });
+    // Lock consultivo (advisory) por quadra, dentro de uma transação.
+    // Ele serializa as inserções concorrentes da MESMA quadra em uma fila
+    // ordenada, evitando os deadlocks que a constraint de exclusão gera sob
+    // alta contenção. A "perdedora" falha na hora com 23P01 (e vira 409),
+    // sem esperar o deadlock_timeout. O lock é liberado ao fim da transação.
+    return await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.resourceId}))`;
+      return tx.booking.create({ data: input });
+    });
   } catch (error) {
     // O banco rejeitou por sobreposição de horário -> 409.
     if (isOverlapConflict(error)) {
