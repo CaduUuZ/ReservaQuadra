@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    // --- Saída e versão de JS ---
+    "target": "ES2022",            // qual versão de JS o TS vai gerar (Node 24 suporta tranquilo)
+    "module": "NodeNext",          // sistema de módulos moderno (ESM) que o Node entende
+    "moduleResolution": "NodeNext",// como o TS resolve os imports (combina com o de cima)
+    "outDir": "./dist",            // onde os .js compilados vão parar (npm run build)
+    "rootDir": "./src",            // onde está nosso código-fonte .ts
+
+    // --- Rigor (pega bugs em tempo de compilação, não em produção) ---
+    "strict": true,                // liga TODAS as checagens rígidas de tipo
+    "noUnusedLocals": true,        // reclama de variável criada e não usada
+    "noUnusedParameters": true,    // reclama de parâmetro não usado
+    "noFallthroughCasesInSwitch": true,
+
+    // --- Interoperabilidade e qualidade de vida ---
+    "esModuleInterop": true,       // deixa importar libs CommonJS sem dor de cabeça
+    "skipLibCheck": true,          // não checa tipos dentro do node_modules (build mais rápido)
+    "forceConsistentCasingInFileNames": true, // evita bug de maiúscula/minúscula (Win x Linux)
+    "resolveJsonModule": true,     // permite importar arquivos .json
+    "sourceMap": true              // gera mapa pra debugar o .ts mesmo rodando o .js
+  },
+  "include": ["src/**/*.ts"],      // o que compilar
+  "exclude": ["node_modules", "dist"]
+}

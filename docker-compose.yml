@@ -1,0 +1,26 @@
+# Sobe um Postgres pronto pra desenvolvimento com um único comando:
+#   docker compose up -d
+#
+# O "-d" (detached) deixa rodando em segundo plano.
+
+services:
+  db:
+    image: postgres:16            # imagem oficial; já traz a extensão btree_gist que vamos precisar
+    container_name: reservaquadra-db
+    restart: unless-stopped       # se o container cair, o Docker sobe de novo (menos no stop manual)
+    environment:
+      POSTGRES_USER: reserva      # usuário do banco
+      POSTGRES_PASSWORD: reserva  # senha (ok pra dev local; em prod isso vira secret)
+      POSTGRES_DB: reservaquadra  # nome do banco criado no primeiro boot
+    ports:
+      - "5432:5432"               # expõe a porta do Postgres pra sua máquina (host:container)
+    volumes:
+      - reservaquadra-data:/var/lib/postgresql/data  # persiste os dados mesmo se o container for recriado
+    healthcheck:                  # o Docker fica testando se o banco já está pronto pra aceitar conexão
+      test: ["CMD-SHELL", "pg_isready -U reserva -d reservaquadra"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  reservaquadra-data:             # volume nomeado (gerenciado pelo Docker) pra guardar os dados

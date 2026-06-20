@@ -1,0 +1,35 @@
+{
+  "name": "reservaquadra",
+  "version": "1.0.0",
+  "description": "Sistema utilizando Node, Prisma e Docker para reserva de quadras com requisições simultâneas.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CaduUuZ/ReservaQuadra.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/CaduUuZ/ReservaQuadra/issues"
+  },
+  "homepage": "https://github.com/CaduUuZ/ReservaQuadra#readme",
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "dotenv": "^17.4.2",
+    "prisma": "^7.8.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.8.0"
+  }
+}
