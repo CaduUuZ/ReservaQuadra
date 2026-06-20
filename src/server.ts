@@ -1,5 +1,8 @@
-// Ponto de entrada da aplicação.
-// Por enquanto é só um "smoke test" pra confirmar que TypeScript + tsx estão funcionando.
-// Nas próximas fases isso vira o servidor HTTP de verdade (Express).
+// Ponto de entrada: sobe o servidor HTTP.
+import { app } from "./app.js";
 
-console.log("✅ ReservaQuadra: toolchain TypeScript funcionando!");
+const PORT = Number(process.env.PORT) || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 ReservaQuadra ouvindo em http://localhost:${PORT}`);
+});
