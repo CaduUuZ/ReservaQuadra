@@ -1,7 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Schema do Prisma — define os models que viram tabelas no Postgres.
+// Doc: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +8,45 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// Usuário que faz reservas.
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  email     String    @unique
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  bookings  Booking[]
+
+  @@map("users")
+}
+
+// A quadra (o recurso que é reservado).
+model Resource {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  bookings  Booking[]
+
+  @@map("resources")
+}
+
+// A reserva: uma quadra ocupada por um usuário em um intervalo de tempo.
+model Booking {
+  id         String   @id @default(uuid()) @db.Uuid
+  // Relação com a quadra. onDelete: Cascade = se a quadra some, as reservas dela somem junto.
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resourceId String   @map("resource_id") @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id") @db.Uuid
+  // Guardamos início e fim como timestamptz. O "intervalo" (range) que impede
+  // sobreposição é montado a partir destas duas colunas na constraint EXCLUDE
+  // (adicionada manualmente na migration). Por isso o @map importa: o SQL da
+  // constraint referencia os nomes reais das colunas (starts_at, ends_at, resource_id).
+  startsAt   DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime @map("ends_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([resourceId])
+  @@map("bookings")
 }

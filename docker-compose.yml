@@ -13,7 +13,9 @@ services:
       POSTGRES_PASSWORD: reserva  # senha (ok pra dev local; em prod isso vira secret)
       POSTGRES_DB: reservaquadra  # nome do banco criado no primeiro boot
     ports:
-      - "5432:5432"               # expõe a porta do Postgres pra sua máquina (host:container)
+      # Usamos 5433 no host porque a 5432 já está ocupada por um Postgres nativo da máquina.
+      # Formato host:container — dentro do container o Postgres continua na 5432.
+      - "5433:5432"
     volumes:
       - reservaquadra-data:/var/lib/postgresql/data  # persiste os dados mesmo se o container for recriado
     healthcheck:                  # o Docker fica testando se o banco já está pronto pra aceitar conexão
