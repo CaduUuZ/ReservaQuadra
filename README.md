@@ -208,6 +208,14 @@ npm install
 npm run dev   # abre em http://localhost:5173
 ```
 
+## 🧪 Testes
+
+Testes de integração contra um **Postgres real e descartável** (Testcontainers): cada execução sobe um container próprio, aplica as migrations e roda a suíte contra ele — sem mocks. Cobrem o coração do projeto: a exclusion constraint (409), horários encostados, FK inexistente (404), **concorrência** (30 simultâneas → 1 sucesso) e a **promoção da waitlist**.
+
+```bash
+npm test
+```
+
 > ℹ️ O `docker-compose.yml` mapeia o Postgres na porta **5433** do host (pra não conflitar com uma instalação local na 5432). A `DATABASE_URL` já reflete isso.
 
 ---
