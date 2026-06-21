@@ -1,0 +1,259 @@
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError } from "./api";
+import type { Availability, Booking, Resource, Slot, User, WaitlistEntry } from "./types";
+import "./App.css";
+
+// Mostra a hora (UTC) de um ISO. O backend trabalha em UTC, então exibimos UTC
+// pra não confundir com o fuso do navegador.
+const fmtTime = (iso: string) => iso.slice(11, 16);
+const today = () => new Date().toISOString().slice(0, 10);
+
+type Toast = { kind: "success" | "error" | "info"; text: string } | null;
+
+export default function App() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [userId, setUserId] = useState("");
+  const [resourceId, setResourceId] = useState("");
+  const [date, setDate] = useState(today());
+
+  const [availability, setAvailability] = useState<Availability | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [toast, setToast] = useState<Toast>(null);
+
+  const flash = (kind: NonNullable<Toast>["kind"], text: string) => {
+    setToast({ kind, text });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  // Carrega usuários e quadras uma vez, e escolhe os primeiros como padrão.
+  useEffect(() => {
+    Promise.all([api.listUsers(), api.listResources()])
+      .then(([us, rs]) => {
+        setUsers(us);
+        setResources(rs);
+        if (us[0]) setUserId(us[0].id);
+        if (rs[0]) setResourceId(rs[0].id);
+      })
+      .catch(() => flash("error", "API offline? Rode `npm run dev` no backend."));
+  }, []);
+
+  // Recarrega disponibilidade + reservas + fila sempre que muda quadra ou data.
+  const refresh = useCallback(async () => {
+    if (!resourceId) return;
+    const [av, bk, wl] = await Promise.all([
+      api.getAvailability(resourceId, date),
+      api.listBookings({ resourceId, date }),
+      api.listWaitlist({ resourceId }),
+    ]);
+    setAvailability(av);
+    setBookings(bk);
+    setWaitlist(wl);
+  }, [resourceId, date]);
+
+  useEffect(() => {
+    refresh().catch(() => {});
+  }, [refresh]);
+
+  // Clicar num horário: livre -> reserva; ocupado -> entra na fila.
+  const onSlotClick = async (slot: Slot) => {
+    if (!userId) return flash("error", "Escolha um usuário primeiro.");
+    const payload = { resourceId, userId, startsAt: slot.startsAt, endsAt: slot.endsAt };
+    try {
+      if (slot.available) {
+        await api.createBooking(payload);
+        flash("success", `Reserva criada às ${fmtTime(slot.startsAt)} ✓`);
+      } else {
+        await api.joinWaitlist(payload);
+        flash("info", `Você entrou na fila das ${fmtTime(slot.startsAt)} 🎟️`);
+      }
+      await refresh();
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Erro inesperado";
+      flash("error", msg);
+    }
+  };
+
+  const onCancel = async (booking: Booking) => {
+    try {
+      const result = await api.cancelBooking(booking.id);
+      if (result.promoted) {
+        const who = users.find((u) => u.id === result.promoted!.userId)?.name ?? "alguém";
+        flash("success", `Reserva cancelada — ${who} foi promovido da fila! 🎉`);
+      } else {
+        flash("info", "Reserva cancelada.");
+      }
+      await refresh();
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro ao cancelar");
+    }
+  };
+
+  const onLeaveQueue = async (entry: WaitlistEntry) => {
+    try {
+      await api.leaveWaitlist(entry.id);
+      flash("info", "Você saiu da fila.");
+      await refresh();
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro");
+    }
+  };
+
+  const userName = (id: string) => users.find((u) => u.id === id)?.name ?? id.slice(0, 8);
+
+  return (
+    <div className="app">
+      <header>
+        <h1>🏐 ReservaQuadra</h1>
+        <span className="subtitle">painel de reservas · concorrência garantida pelo banco</span>
+      </header>
+
+      <div className="controls">
+        <label>
+          Usuário
+          <select value={userId} onChange={(e) => setUserId(e.target.value)}>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Quadra
+          <select value={resourceId} onChange={(e) => setResourceId(e.target.value)}>
+            {resources.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Data
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+      </div>
+
+      <main className="grid">
+        <section className="card">
+          <h2>Disponibilidade <small>(UTC)</small></h2>
+          <p className="hint">Clique num horário livre pra reservar, ou num ocupado pra entrar na fila.</p>
+          <div className="slots">
+            {availability?.slots.map((slot) => (
+              <button
+                key={slot.startsAt}
+                className={`slot ${slot.available ? "free" : "busy"}`}
+                onClick={() => onSlotClick(slot)}
+                title={slot.available ? "Livre — clique pra reservar" : "Ocupado — clique pra entrar na fila"}
+              >
+                {fmtTime(slot.startsAt)}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="card">
+          <h2>Reservas do dia</h2>
+          {bookings.length === 0 && <p className="empty">Nenhuma reserva nesse dia.</p>}
+          <ul className="list">
+            {bookings.map((b) => (
+              <li key={b.id}>
+                <span>{fmtTime(b.startsAt)}–{fmtTime(b.endsAt)} · <b>{b.user?.name ?? userName(b.userId)}</b></span>
+                <button className="ghost" onClick={() => onCancel(b)}>cancelar</button>
+              </li>
+            ))}
+          </ul>
+
+          <h2 className="mt">Fila de espera</h2>
+          {waitlist.length === 0 && <p className="empty">Fila vazia.</p>}
+          <ul className="list">
+            {waitlist.map((w) => (
+              <li key={w.id}>
+                <span><span className="pos">#{w.position}</span> {fmtTime(w.startsAt)}–{fmtTime(w.endsAt)} · <b>{w.user?.name ?? userName(w.userId)}</b></span>
+                <button className="ghost" onClick={() => onLeaveQueue(w)}>sair</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <ConcurrencyDemo
+          slots={availability?.slots ?? []}
+          resourceId={resourceId}
+          userId={userId}
+          onDone={refresh}
+          flash={flash}
+        />
+      </main>
+
+      {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
+    </div>
+  );
+}
+
+// --- Demo de concorrência: dispara N reservas simultâneas no mesmo horário ---
+function ConcurrencyDemo({
+  slots,
+  resourceId,
+  userId,
+  onDone,
+  flash,
+}: {
+  slots: Slot[];
+  resourceId: string;
+  userId: string;
+  onDone: () => Promise<void>;
+  flash: (kind: "success" | "error" | "info", text: string) => void;
+}) {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<{ ok: number; conflict: number; other: number } | null>(null);
+
+  const firstFree = slots.find((s) => s.available);
+
+  const run = async (n: number) => {
+    if (!firstFree) return flash("error", "Sem horário livre pra demonstrar.");
+    if (!userId) return flash("error", "Escolha um usuário.");
+    setRunning(true);
+    setResult(null);
+    const payload = {
+      resourceId,
+      userId,
+      startsAt: firstFree.startsAt,
+      endsAt: firstFree.endsAt,
+    };
+    // Promise.all = todas as requisições disparadas "ao mesmo tempo".
+    const settled = await Promise.allSettled(
+      Array.from({ length: n }, () => api.createBooking(payload)),
+    );
+    let ok = 0, conflict = 0, other = 0;
+    for (const s of settled) {
+      if (s.status === "fulfilled") ok++;
+      else if (s.reason instanceof ApiError && s.reason.status === 409) conflict++;
+      else other++;
+    }
+    setResult({ ok, conflict, other });
+    setRunning(false);
+    await onDone();
+  };
+
+  return (
+    <section className="card demo">
+      <h2>⚡ Teste de concorrência</h2>
+      <p className="hint">
+        Dispara N reservas <b>simultâneas</b> no primeiro horário livre
+        {firstFree ? ` (${fmtTime(firstFree.startsAt)})` : ""}. O esperado: <b>1 criada</b>, o resto bloqueado pelo banco.
+      </p>
+      <div className="demo-buttons">
+        {[10, 30, 50].map((n) => (
+          <button key={n} disabled={running || !firstFree} onClick={() => run(n)}>
+            {running ? "..." : `disparar ${n}`}
+          </button>
+        ))}
+      </div>
+      {result && (
+        <div className="demo-result">
+          <span className="ok">✓ {result.ok} criada</span>
+          <span className="conflict">⛔ {result.conflict} conflito</span>
+          {result.other > 0 && <span className="other">⚠ {result.other} outro</span>}
+        </div>
+      )}
+    </section>
+  );
+}

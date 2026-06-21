@@ -7,7 +7,7 @@ import { AppError, ValidationError } from "../errors.js";
 
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   // O Express identifica o error handler pela assinatura de 4 args — por isso
   // "next" precisa existir mesmo sem ser usado.
@@ -28,6 +28,6 @@ export function errorHandler(
   }
 
   // 3) Qualquer outra coisa é um bug inesperado -> 500 (e logamos pra investigar).
-  console.error("[erro inesperado]", err);
+  req.log.error({ err }, "erro inesperado");
   res.status(500).json({ error: "Erro interno do servidor" });
 }

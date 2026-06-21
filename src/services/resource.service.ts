@@ -13,6 +13,10 @@ interface Slot {
   available: boolean;
 }
 
+export async function listResources() {
+  return prisma.resource.findMany({ orderBy: { name: "asc" } });
+}
+
 export async function getAvailability(resourceId: string, date: Date) {
   // 1) A quadra precisa existir.
   const resource = await prisma.resource.findUnique({ where: { id: resourceId } });
