@@ -23,14 +23,24 @@ export interface Availability {
   slots: Slot[];
 }
 
+export interface Participant {
+  id: string;
+  bookingId: string;
+  userId: string | null;
+  guestName: string | null;
+  team: number | null;
+  user?: User;
+}
+
 export interface Booking {
   id: string;
   resourceId: string;
-  userId: string;
+  userId: string; // o DONO do jogo
   startsAt: string;
   endsAt: string;
   resource?: Resource;
   user?: User;
+  participants?: Participant[];
 }
 
 export interface WaitlistEntry {

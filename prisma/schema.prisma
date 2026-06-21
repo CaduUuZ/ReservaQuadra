@@ -17,8 +17,9 @@ model User {
   email     String          @unique
   password  String // hash bcrypt — NUNCA a senha em texto puro
   createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  bookings  Booking[]
+  bookings  Booking[] // reservas das quais é DONO
   waitlist  WaitlistEntry[]
+  participations Participant[] // jogos dos quais participa (como usuário cadastrado)
 
   @@map("users")
 }
@@ -74,7 +75,27 @@ model Booking {
   startsAt   DateTime @map("starts_at") @db.Timestamptz(6)
   endsAt     DateTime @map("ends_at") @db.Timestamptz(6)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  // O "user/userId" acima é o DONO do jogo. Os jogadores (incl. o dono) ficam aqui.
+  participants Participant[]
 
   @@index([resourceId])
   @@map("bookings")
+}
+
+// Um participante de um jogo (reserva). É um usuário cadastrado (userId) OU um
+// convidado sem conta (guestName). A CHECK constraint na migration garante que
+// exatamente um dos dois esteja preenchido.
+model Participant {
+  id        String   @id @default(uuid()) @db.Uuid
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String   @map("booking_id") @db.Uuid
+  // Se for um usuário cadastrado, aponta pra ele; se sair, vira convidado anônimo.
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?  @map("user_id") @db.Uuid
+  guestName String?  @map("guest_name") // preenchido quando é convidado (sem conta)
+  team      Int? // usado na Fase 10 (separação de times); null = sem time ainda
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([bookingId])
+  @@map("participants")
 }

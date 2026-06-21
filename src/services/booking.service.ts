@@ -27,7 +27,10 @@ export async function createBooking(input: CreateBookingInput) {
     // sem esperar o deadlock_timeout. O lock é liberado ao fim da transação.
     return await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.resourceId}))`;
-      return tx.booking.create({ data: input });
+      // O dono já entra como o 1º participante do jogo (player 1).
+      return tx.booking.create({
+        data: { ...input, participants: { create: { userId: input.userId } } },
+      });
     });
   } catch (error) {
     // O banco rejeitou por sobreposição de horário -> 409.
@@ -61,7 +64,14 @@ export async function listBookings(filters: ListBookingFilters) {
   return prisma.booking.findMany({
     where,
     orderBy: { startsAt: "asc" },
-    include: { resource: true, user: true },
+    include: {
+      resource: true,
+      user: true,
+      participants: {
+        include: { user: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
 }
 
@@ -108,6 +118,7 @@ export async function cancelBooking(id: string, requesterId?: string) {
         userId: next.userId,
         startsAt: next.startsAt,
         endsAt: next.endsAt,
+        participants: { create: { userId: next.userId } }, // dono promovido vira participante
       },
     });
     await tx.waitlistEntry.update({

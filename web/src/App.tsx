@@ -148,18 +148,21 @@ export default function App() {
         </section>
 
         <section className="card">
-          <h2>Reservas do dia</h2>
-          {bookings.length === 0 && <p className="empty">Nenhuma reserva nesse dia.</p>}
-          <ul className="list">
+          <h2>Jogos do dia</h2>
+          <p className="hint">Clique num jogo pra ver/gerenciar os participantes.</p>
+          {bookings.length === 0 && <p className="empty">Nenhum jogo nesse dia.</p>}
+          <div className="games">
             {bookings.map((b) => (
-              <li key={b.id}>
-                <span>{fmtTime(b.startsAt)}–{fmtTime(b.endsAt)} · <b>{b.user?.name ?? "—"}</b></span>
-                {b.userId === user.id && (
-                  <button className="ghost" onClick={() => onCancel(b)}>cancelar</button>
-                )}
-              </li>
+              <BookingItem
+                key={b.id}
+                booking={b}
+                currentUserId={user.id}
+                onCancel={() => onCancel(b)}
+                onChanged={refresh}
+                flash={flash}
+              />
             ))}
-          </ul>
+          </div>
 
           <h2 className="mt">Fila de espera</h2>
           {waitlist.length === 0 && <p className="empty">Fila vazia.</p>}
@@ -184,6 +187,91 @@ export default function App() {
       </main>
 
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
+    </div>
+  );
+}
+
+// --- Card de um jogo: expande pra ver/gerenciar participantes ---
+function BookingItem({
+  booking,
+  currentUserId,
+  onCancel,
+  onChanged,
+  flash,
+}: {
+  booking: Booking;
+  currentUserId: string;
+  onCancel: () => void;
+  onChanged: () => Promise<void>;
+  flash: (kind: "success" | "error" | "info", text: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [guest, setGuest] = useState("");
+  const isOwner = booking.userId === currentUserId;
+  const parts = booking.participants ?? [];
+
+  const addGuest = async () => {
+    const name = guest.trim();
+    if (!name) return;
+    try {
+      await api.addParticipant(booking.id, { guestName: name });
+      setGuest("");
+      await onChanged();
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro ao adicionar");
+    }
+  };
+
+  const removeParticipant = async (participantId: string) => {
+    try {
+      await api.removeParticipant(booking.id, participantId);
+      await onChanged();
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro ao remover");
+    }
+  };
+
+  return (
+    <div className="game">
+      <div className="game-head">
+        <button className="game-toggle" onClick={() => setOpen((v) => !v)}>
+          <span className="chev">{open ? "▾" : "▸"}</span>
+          {fmtTime(booking.startsAt)}–{fmtTime(booking.endsAt)} · <b>{booking.user?.name ?? "—"}</b>
+          <span className="count">{parts.length} 👥</span>
+        </button>
+        {isOwner && <button className="ghost" onClick={onCancel}>cancelar</button>}
+      </div>
+
+      {open && (
+        <div className="game-body">
+          <ul className="part-list">
+            {parts.map((p) => (
+              <li key={p.id}>
+                <span>
+                  {p.user ? p.user.name : <em>{p.guestName} (convidado)</em>}
+                  {p.userId === booking.userId && " 👑"}
+                </span>
+                {isOwner && p.userId !== booking.userId && (
+                  <button className="x" title="remover" onClick={() => removeParticipant(p.id)}>
+                    ×
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {isOwner && (
+            <div className="add-guest">
+              <input
+                placeholder="nome do convidado"
+                value={guest}
+                onChange={(e) => setGuest(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addGuest()}
+              />
+              <button onClick={addGuest}>+ convidado</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type {
   Availability,
   Booking,
   CancelResult,
+  Participant,
   Resource,
   User,
   WaitlistEntry,
@@ -79,6 +80,17 @@ export const api = {
     request<Booking>("/bookings", { method: "POST", body: JSON.stringify(input) }),
   cancelBooking: (id: string) =>
     request<CancelResult>(`/bookings/${id}`, { method: "DELETE" }),
+
+  // --- Participantes de um jogo ---
+  addParticipant: (bookingId: string, input: { userId?: string; guestName?: string }) =>
+    request<Participant>(`/bookings/${bookingId}/participants`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  removeParticipant: (bookingId: string, participantId: string) =>
+    request<void>(`/bookings/${bookingId}/participants/${participantId}`, {
+      method: "DELETE",
+    }),
 
   // --- Fila de espera ---
   listWaitlist: (params: { resourceId?: string } = {}) => {

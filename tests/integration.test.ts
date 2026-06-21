@@ -11,6 +11,7 @@ let bookingService: typeof import("../src/services/booking.service.js");
 let waitlistService: typeof import("../src/services/waitlist.service.js");
 let resourceService: typeof import("../src/services/resource.service.js");
 let authService: typeof import("../src/services/auth.service.js");
+let participantService: typeof import("../src/services/participant.service.js");
 
 const RESOURCE = "11111111-1111-1111-1111-111111111111";
 const ALICE = "22222222-2222-2222-2222-222222222222";
@@ -27,6 +28,7 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
     waitlistService = await import("../src/services/waitlist.service.js");
     resourceService = await import("../src/services/resource.service.js");
     authService = await import("../src/services/auth.service.js");
+    participantService = await import("../src/services/participant.service.js");
 
     // Dados base que persistem por toda a suíte. (password é coluna obrigatória;
     // aqui um valor qualquer basta, pois estes testes não exercitam login.)
@@ -149,6 +151,37 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
     await assert.rejects(
       authService.login({ email: "sec@test.dev", password: "errada" }),
       (err) => err instanceof UnauthorizedError && err.statusCode === 401,
+    );
+  });
+
+  it("criar jogo adiciona o dono como participante", async () => {
+    const booking = await bookingService.createBooking({
+      resourceId: RESOURCE,
+      userId: ALICE,
+      startsAt: S,
+      endsAt: E,
+    });
+    const parts = await prisma.participant.findMany({ where: { bookingId: booking.id } });
+    assert.equal(parts.length, 1);
+    assert.equal(parts[0].userId, ALICE);
+  });
+
+  it("adiciona convidado e a CHECK barra participante sem usuário nem nome", async () => {
+    const booking = await bookingService.createBooking({
+      resourceId: RESOURCE,
+      userId: ALICE,
+      startsAt: S,
+      endsAt: E,
+    });
+    // Convidado válido (só nome) entra normalmente.
+    const guest = await participantService.addParticipant(booking.id, ALICE, {
+      guestName: "Zé",
+    });
+    assert.equal(guest.guestName, "Zé");
+
+    // A CHECK constraint do banco rejeita "nem usuário, nem convidado".
+    await assert.rejects(
+      prisma.participant.create({ data: { bookingId: booking.id } }),
     );
   });
 });

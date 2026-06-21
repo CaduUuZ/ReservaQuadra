@@ -41,15 +41,18 @@ A integridade passa a ser uma **invariante do banco**, não uma esperança da ap
 
 ```mermaid
 erDiagram
-    USERS ||--o{ BOOKINGS : faz
+    USERS ||--o{ BOOKINGS : "é dono"
     RESOURCES ||--o{ BOOKINGS : tem
     USERS ||--o{ WAITLIST_ENTRIES : aguarda
     RESOURCES ||--o{ WAITLIST_ENTRIES : tem
+    BOOKINGS ||--o{ PARTICIPANTS : tem
+    USERS |o--o{ PARTICIPANTS : "joga (opcional)"
 
     USERS {
         uuid id PK
         string name
         string email UK
+        string password
     }
     RESOURCES {
         uuid id PK
@@ -61,6 +64,13 @@ erDiagram
         uuid user_id FK
         timestamptz starts_at
         timestamptz ends_at
+    }
+    PARTICIPANTS {
+        uuid id PK
+        uuid booking_id FK
+        uuid user_id FK "null = convidado"
+        string guest_name "null = cadastrado"
+        int team
     }
     WAITLIST_ENTRIES {
         uuid id PK
@@ -150,6 +160,10 @@ sequenceDiagram
 
 ---
 
+## 🎮 Jogos & convidados
+
+Uma reserva é um **jogo**: tem um **dono** (logado, responde pela quadra) e uma lista de **participantes**. Cada participante é um **usuário cadastrado** ou um **convidado** (só um nome, sem conta) — login é obrigatório só pra quem reserva, não pra quem joga. Uma **CHECK constraint** no banco garante que todo participante é exatamente um dos dois (`user_id` XOR `guest_name`). O dono entra como participante automaticamente ao criar o jogo.
+
 ## 🔐 Autenticação
 
 JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). No login/registro a API devolve um token; o cliente o envia no header `Authorization: Bearer <token>`. As rotas de reserva/fila são protegidas, e o `userId` vem **do token** — ninguém reserva em nome de outro. Cancelamento exige ser o **dono** da reserva (403 caso contrário).
@@ -163,9 +177,11 @@ JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). 
 | `GET` | `/auth/me` | 🔒 | Perfil do usuário logado |
 | `GET` | `/health` | | Healthcheck (app + banco) |
 | `GET` | `/resources` · `/resources/:id/availability?date=` | 🔒 | Quadras e disponibilidade |
-| `POST` | `/bookings` | 🔒 | Cria reserva (`409` se conflitar) |
-| `GET` | `/bookings?resourceId=&date=` | 🔒 | Lista reservas com filtros |
+| `POST` | `/bookings` | 🔒 | Cria reserva/jogo (`409` se conflitar) |
+| `GET` | `/bookings?resourceId=&date=` | 🔒 | Lista jogos (com participantes) |
 | `DELETE` | `/bookings/:id` | 🔒 | Cancela (e promove a fila, se houver) |
+| `POST` | `/bookings/:id/participants` | 🔒 | Adiciona participante (usuário ou convidado) |
+| `DELETE` | `/bookings/:id/participants/:pid` | 🔒 | Remove participante (só o dono) |
 | `POST` | `/waitlist` | 🔒 | Entra na fila de um horário |
 | `GET` | `/waitlist?resourceId=` | 🔒 | Lista a fila com posição |
 | `DELETE` | `/waitlist/:id` | 🔒 | Sai da fila |
