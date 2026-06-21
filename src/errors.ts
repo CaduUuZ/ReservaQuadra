@@ -35,3 +35,17 @@ export class ValidationError extends AppError {
     super(400, message);
   }
 }
+
+// 401 — não autenticado (token ausente, inválido ou expirado).
+export class UnauthorizedError extends AppError {
+  constructor(message = "Não autenticado") {
+    super(401, message);
+  }
+}
+
+// 403 — autenticado, mas sem permissão pra esta ação.
+export class ForbiddenError extends AppError {
+  constructor(message = "Acesso negado") {
+    super(403, message);
+  }
+}

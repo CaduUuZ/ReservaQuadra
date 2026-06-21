@@ -2,7 +2,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { startTestDatabase } from "./helpers/testDb.js";
-import { ConflictError, NotFoundError } from "../src/errors.js";
+import { ConflictError, NotFoundError, UnauthorizedError } from "../src/errors.js";
 
 // Tipos só pra IDE; os módulos reais são importados dinamicamente no before().
 let container: StartedPostgreSqlContainer;
@@ -10,6 +10,7 @@ let prisma: (typeof import("../src/db/prisma.js"))["prisma"];
 let bookingService: typeof import("../src/services/booking.service.js");
 let waitlistService: typeof import("../src/services/waitlist.service.js");
 let resourceService: typeof import("../src/services/resource.service.js");
+let authService: typeof import("../src/services/auth.service.js");
 
 const RESOURCE = "11111111-1111-1111-1111-111111111111";
 const ALICE = "22222222-2222-2222-2222-222222222222";
@@ -25,11 +26,13 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
     bookingService = await import("../src/services/booking.service.js");
     waitlistService = await import("../src/services/waitlist.service.js");
     resourceService = await import("../src/services/resource.service.js");
+    authService = await import("../src/services/auth.service.js");
 
-    // Dados base que persistem por toda a suíte.
+    // Dados base que persistem por toda a suíte. (password é coluna obrigatória;
+    // aqui um valor qualquer basta, pois estes testes não exercitam login.)
     await prisma.resource.create({ data: { id: RESOURCE, name: "Quadra A" } });
-    await prisma.user.create({ data: { id: ALICE, name: "Alice", email: "alice@test.dev" } });
-    await prisma.user.create({ data: { id: BOB, name: "Bob", email: "bob@test.dev" } });
+    await prisma.user.create({ data: { id: ALICE, name: "Alice", email: "alice@test.dev", password: "x" } });
+    await prisma.user.create({ data: { id: BOB, name: "Bob", email: "bob@test.dev", password: "x" } });
   }, { timeout: 180_000 }); // subir o container pode demorar na 1ª vez
 
   after(async () => {
@@ -126,5 +129,26 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
     const availability = await resourceService.getAvailability(RESOURCE, new Date("2026-07-01"));
     const slot10 = availability.slots.find((s) => s.startsAt.toISOString().startsWith("2026-07-01T10:00"));
     assert.equal(slot10?.available, false);
+  });
+
+  it("registro cria usuário com senha hasheada e devolve token", async () => {
+    const res = await authService.register({
+      name: "Nova",
+      email: "nova@test.dev",
+      password: "senha123",
+    });
+    assert.ok(res.token, "deve retornar um token");
+    assert.equal(res.user.email, "nova@test.dev");
+    // A senha foi hasheada (não ficou em texto puro no banco).
+    const stored = await prisma.user.findUnique({ where: { id: res.user.id } });
+    assert.notEqual(stored?.password, "senha123");
+  });
+
+  it("login com senha errada lança UnauthorizedError (401)", async () => {
+    await authService.register({ name: "Sec", email: "sec@test.dev", password: "certa123" });
+    await assert.rejects(
+      authService.login({ email: "sec@test.dev", password: "errada" }),
+      (err) => err instanceof UnauthorizedError && err.statusCode === 401,
+    );
   });
 });

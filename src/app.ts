@@ -7,6 +7,8 @@ import { resourceRouter } from "./routes/resource.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { waitlistRouter } from "./routes/waitlist.routes.js";
 import { userRouter } from "./routes/user.routes.js";
+import { authRouter } from "./routes/auth.routes.js";
+import { authMiddleware } from "./middlewares/auth.js";
 import { errorHandler } from "./middlewares/error-handler.js";
 
 export const app = express();
@@ -22,12 +24,15 @@ app.use(pinoHttp({ logger }));
 // Faz o Express parsear corpo JSON e popular req.body.
 app.use(express.json());
 
-// Rotas da aplicação.
+// Rotas públicas (não exigem login).
 app.use("/health", healthRouter);
-app.use("/resources", resourceRouter);
-app.use("/bookings", bookingRouter);
-app.use("/waitlist", waitlistRouter);
-app.use("/users", userRouter);
+app.use("/auth", authRouter);
+
+// Rotas protegidas: o authMiddleware roda antes e exige um JWT válido.
+app.use("/resources", authMiddleware, resourceRouter);
+app.use("/bookings", authMiddleware, bookingRouter);
+app.use("/waitlist", authMiddleware, waitlistRouter);
+app.use("/users", authMiddleware, userRouter);
 
 // Rota não encontrada -> 404 padronizado.
 app.use((_req, res) => {

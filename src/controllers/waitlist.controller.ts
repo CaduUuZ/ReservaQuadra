@@ -2,10 +2,10 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import * as waitlistService from "../services/waitlist.service.js";
 
+// userId vem do token (req.userId), não do corpo.
 const joinSchema = z
   .object({
     resourceId: z.guid("resourceId deve ser um UUID"),
-    userId: z.guid("userId deve ser um UUID"),
     startsAt: z.coerce.date(),
     endsAt: z.coerce.date(),
   })
@@ -23,7 +23,7 @@ const idSchema = z.object({ id: z.guid("id deve ser um UUID") });
 
 export async function join(req: Request, res: Response) {
   const data = joinSchema.parse(req.body);
-  const entry = await waitlistService.joinWaitlist(data);
+  const entry = await waitlistService.joinWaitlist({ ...data, userId: req.userId! });
   res.status(201).json(entry);
 }
 

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
-import type { Availability, Booking, Resource, Slot, User, WaitlistEntry } from "./types";
+import type { Availability, Booking, Resource, Slot, WaitlistEntry } from "./types";
+import { useAuth } from "./auth/AuthContext";
+import { AuthPage } from "./components/AuthPage";
 import "./App.css";
 
 // Mostra a hora (UTC) de um ISO. O backend trabalha em UTC, então exibimos UTC
@@ -11,9 +13,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 type Toast = { kind: "success" | "error" | "info"; text: string } | null;
 
 export default function App() {
-  const [users, setUsers] = useState<User[]>([]);
+  const { user, loading, logout } = useAuth();
+
   const [resources, setResources] = useState<Resource[]>([]);
-  const [userId, setUserId] = useState("");
   const [resourceId, setResourceId] = useState("");
   const [date, setDate] = useState(today());
 
@@ -27,19 +29,19 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Carrega usuários e quadras uma vez, e escolhe os primeiros como padrão.
+  // Carrega as quadras quando há usuário logado.
   useEffect(() => {
-    Promise.all([api.listUsers(), api.listResources()])
-      .then(([us, rs]) => {
-        setUsers(us);
+    if (!user) return;
+    api
+      .listResources()
+      .then((rs) => {
         setResources(rs);
-        if (us[0]) setUserId(us[0].id);
         if (rs[0]) setResourceId(rs[0].id);
       })
-      .catch(() => flash("error", "API offline? Rode `npm run dev` no backend."));
-  }, []);
+      .catch(() => flash("error", "Não consegui carregar as quadras."));
+  }, [user]);
 
-  // Recarrega disponibilidade + reservas + fila sempre que muda quadra ou data.
+  // Recarrega disponibilidade + reservas + fila quando muda quadra ou data.
   const refresh = useCallback(async () => {
     if (!resourceId) return;
     const [av, bk, wl] = await Promise.all([
@@ -58,8 +60,7 @@ export default function App() {
 
   // Clicar num horário: livre -> reserva; ocupado -> entra na fila.
   const onSlotClick = async (slot: Slot) => {
-    if (!userId) return flash("error", "Escolha um usuário primeiro.");
-    const payload = { resourceId, userId, startsAt: slot.startsAt, endsAt: slot.endsAt };
+    const payload = { resourceId, startsAt: slot.startsAt, endsAt: slot.endsAt };
     try {
       if (slot.available) {
         await api.createBooking(payload);
@@ -70,8 +71,7 @@ export default function App() {
       }
       await refresh();
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "Erro inesperado";
-      flash("error", msg);
+      flash("error", e instanceof ApiError ? e.message : "Erro inesperado");
     }
   };
 
@@ -79,8 +79,7 @@ export default function App() {
     try {
       const result = await api.cancelBooking(booking.id);
       if (result.promoted) {
-        const who = users.find((u) => u.id === result.promoted!.userId)?.name ?? "alguém";
-        flash("success", `Reserva cancelada — ${who} foi promovido da fila! 🎉`);
+        flash("success", "Reserva cancelada — o próximo da fila foi promovido! 🎉");
       } else {
         flash("info", "Reserva cancelada.");
       }
@@ -100,24 +99,22 @@ export default function App() {
     }
   };
 
-  const userName = (id: string) => users.find((u) => u.id === id)?.name ?? id.slice(0, 8);
+  // --- Telas de boot / não autenticado ---
+  if (loading) return <div className="boot">carregando…</div>;
+  if (!user) return <AuthPage />;
 
   return (
     <div className="app">
       <header>
         <h1>🏐 ReservaQuadra</h1>
         <span className="subtitle">painel de reservas · concorrência garantida pelo banco</span>
+        <div className="user-box">
+          <span>👤 {user.name}</span>
+          <button className="ghost" onClick={logout}>sair</button>
+        </div>
       </header>
 
       <div className="controls">
-        <label>
-          Usuário
-          <select value={userId} onChange={(e) => setUserId(e.target.value)}>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>{u.name}</option>
-            ))}
-          </select>
-        </label>
         <label>
           Quadra
           <select value={resourceId} onChange={(e) => setResourceId(e.target.value)}>
@@ -156,8 +153,10 @@ export default function App() {
           <ul className="list">
             {bookings.map((b) => (
               <li key={b.id}>
-                <span>{fmtTime(b.startsAt)}–{fmtTime(b.endsAt)} · <b>{b.user?.name ?? userName(b.userId)}</b></span>
-                <button className="ghost" onClick={() => onCancel(b)}>cancelar</button>
+                <span>{fmtTime(b.startsAt)}–{fmtTime(b.endsAt)} · <b>{b.user?.name ?? "—"}</b></span>
+                {b.userId === user.id && (
+                  <button className="ghost" onClick={() => onCancel(b)}>cancelar</button>
+                )}
               </li>
             ))}
           </ul>
@@ -167,8 +166,10 @@ export default function App() {
           <ul className="list">
             {waitlist.map((w) => (
               <li key={w.id}>
-                <span><span className="pos">#{w.position}</span> {fmtTime(w.startsAt)}–{fmtTime(w.endsAt)} · <b>{w.user?.name ?? userName(w.userId)}</b></span>
-                <button className="ghost" onClick={() => onLeaveQueue(w)}>sair</button>
+                <span><span className="pos">#{w.position}</span> {fmtTime(w.startsAt)}–{fmtTime(w.endsAt)} · <b>{w.user?.name ?? "—"}</b></span>
+                {w.userId === user.id && (
+                  <button className="ghost" onClick={() => onLeaveQueue(w)}>sair</button>
+                )}
               </li>
             ))}
           </ul>
@@ -177,7 +178,6 @@ export default function App() {
         <ConcurrencyDemo
           slots={availability?.slots ?? []}
           resourceId={resourceId}
-          userId={userId}
           onDone={refresh}
           flash={flash}
         />
@@ -192,13 +192,11 @@ export default function App() {
 function ConcurrencyDemo({
   slots,
   resourceId,
-  userId,
   onDone,
   flash,
 }: {
   slots: Slot[];
   resourceId: string;
-  userId: string;
   onDone: () => Promise<void>;
   flash: (kind: "success" | "error" | "info", text: string) => void;
 }) {
@@ -209,15 +207,9 @@ function ConcurrencyDemo({
 
   const run = async (n: number) => {
     if (!firstFree) return flash("error", "Sem horário livre pra demonstrar.");
-    if (!userId) return flash("error", "Escolha um usuário.");
     setRunning(true);
     setResult(null);
-    const payload = {
-      resourceId,
-      userId,
-      startsAt: firstFree.startsAt,
-      endsAt: firstFree.endsAt,
-    };
+    const payload = { resourceId, startsAt: firstFree.startsAt, endsAt: firstFree.endsAt };
     // Promise.all = todas as requisições disparadas "ao mesmo tempo".
     const settled = await Promise.allSettled(
       Array.from({ length: n }, () => api.createBooking(payload)),

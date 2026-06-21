@@ -11,21 +11,37 @@ import { prisma } from "../src/db/prisma.js";
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
 const N = Number(process.argv[2]) || 50;
 
-// Quadra e usuário criados pelo seed.
+// Quadra criada pelo seed. O usuário agora vem do TOKEN (a rota exige login).
 const RESOURCE_ID = "11111111-1111-1111-1111-111111111111";
-const USER_ID = "22222222-2222-2222-2222-222222222222";
+const SEED_EMAIL = "cadu@reservaquadra.dev";
+const SEED_PASSWORD = "senha123";
 
 // Um horário qualquer no futuro — o mesmo pra todas as requisições.
 const STARTS_AT = "2030-01-01T10:00:00Z";
 const ENDS_AT = "2030-01-01T11:00:00Z";
 
+let token = "";
+
+// Faz login uma vez e guarda o token pra reusar em todas as requisições.
+async function authenticate() {
+  const res = await fetch(`${BASE_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: SEED_EMAIL, password: SEED_PASSWORD }),
+  });
+  if (!res.ok) throw new Error(`Falha no login (${res.status}). Rodou o seed?`);
+  token = (await res.json()).token;
+}
+
 async function postBooking() {
   const res = await fetch(`${BASE_URL}/bookings`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({
       resourceId: RESOURCE_ID,
-      userId: USER_ID,
       startsAt: STARTS_AT,
       endsAt: ENDS_AT,
     }),
@@ -34,6 +50,7 @@ async function postBooking() {
 }
 
 async function main() {
+  await authenticate();
   // Garante o cenário limpo: nenhuma reserva pré-existente nesse horário.
   await prisma.booking.deleteMany({ where: { resourceId: RESOURCE_ID } });
 

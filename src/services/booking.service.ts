@@ -2,7 +2,7 @@
 // ela fala com o banco (Prisma) e lança erros de domínio quando algo dá errado.
 import { Prisma } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
-import { ConflictError, NotFoundError } from "../errors.js";
+import { ConflictError, ForbiddenError, NotFoundError } from "../errors.js";
 import { isForeignKeyViolation, isOverlapConflict } from "../pg-errors.js";
 
 interface CreateBookingInput {
@@ -69,10 +69,16 @@ export async function listBookings(filters: ListBookingFilters) {
 // automaticamente o primeiro da fila (FIFO) a uma nova reserva.
 // Tudo numa única transação + advisory lock por quadra: ou cancela-e-promove
 // junto, ou nada acontece (atômico), e sem corrida com outros createBooking.
-export async function cancelBooking(id: string) {
+// requesterId (opcional): se informado, só o DONO da reserva pode cancelar.
+// Fica opcional pra os testes/scripts internos poderem cancelar sem um "dono".
+export async function cancelBooking(id: string, requesterId?: string) {
   return prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({ where: { id } });
     if (!booking) throw new NotFoundError("Reserva não encontrada");
+
+    if (requesterId && booking.userId !== requesterId) {
+      throw new ForbiddenError("Você só pode cancelar suas próprias reservas");
+    }
 
     // Serializa por quadra (mesma estratégia do createBooking).
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${booking.resourceId}))`;

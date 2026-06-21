@@ -1,6 +1,7 @@
 // Popula dados básicos pra desenvolvimento e pros testes de carga.
 // Usa upsert => rodar de novo não duplica nada (idempotente).
 //   npm run seed
+import bcrypt from "bcryptjs";
 import { prisma } from "../src/db/prisma.js";
 
 // IDs fixos pra facilitar testes manuais e o load test.
@@ -10,16 +11,19 @@ const QUADRA_A = "11111111-1111-1111-1111-111111111111";
 const QUADRA_B = "33333333-3333-3333-3333-333333333333";
 
 async function main() {
+  // Senha padrão dos usuários de exemplo (hasheada). Login: e-mail + "senha123".
+  const senhaHash = await bcrypt.hash("senha123", 10);
+
   const user = await prisma.user.upsert({
     where: { id: USER_ID },
     update: {},
-    create: { id: USER_ID, name: "Cadu", email: "cadu@reservaquadra.dev" },
+    create: { id: USER_ID, name: "Cadu", email: "cadu@reservaquadra.dev", password: senhaHash },
   });
 
   await prisma.user.upsert({
     where: { id: USER_ID_2 },
     update: {},
-    create: { id: USER_ID_2, name: "Bia", email: "bia@reservaquadra.dev" },
+    create: { id: USER_ID_2, name: "Bia", email: "bia@reservaquadra.dev", password: senhaHash },
   });
 
   const resources = await Promise.all([

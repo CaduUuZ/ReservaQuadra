@@ -150,28 +150,35 @@ sequenceDiagram
 
 ---
 
+## 🔐 Autenticação
+
+JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). No login/registro a API devolve um token; o cliente o envia no header `Authorization: Bearer <token>`. As rotas de reserva/fila são protegidas, e o `userId` vem **do token** — ninguém reserva em nome de outro. Cancelamento exige ser o **dono** da reserva (403 caso contrário).
+
 ## 🔌 API
 
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| `GET` | `/health` | Healthcheck (app + banco) |
-| `POST` | `/bookings` | Cria reserva (`409` se conflitar) |
-| `GET` | `/bookings?userId=&resourceId=&date=` | Lista reservas com filtros |
-| `DELETE` | `/bookings/:id` | Cancela (e promove a fila, se houver) |
-| `GET` | `/resources/:id/availability?date=` | Horários livres/ocupados do dia |
-| `POST` | `/waitlist` | Entra na fila de um horário |
-| `GET` | `/waitlist?resourceId=&userId=` | Lista a fila com posição |
-| `DELETE` | `/waitlist/:id` | Sai da fila |
+| Método | Rota | 🔒 | Descrição |
+| --- | --- | :-: | --- |
+| `POST` | `/auth/register` | | Cria conta, devolve token |
+| `POST` | `/auth/login` | | Autentica, devolve token |
+| `GET` | `/auth/me` | 🔒 | Perfil do usuário logado |
+| `GET` | `/health` | | Healthcheck (app + banco) |
+| `GET` | `/resources` · `/resources/:id/availability?date=` | 🔒 | Quadras e disponibilidade |
+| `POST` | `/bookings` | 🔒 | Cria reserva (`409` se conflitar) |
+| `GET` | `/bookings?resourceId=&date=` | 🔒 | Lista reservas com filtros |
+| `DELETE` | `/bookings/:id` | 🔒 | Cancela (e promove a fila, se houver) |
+| `POST` | `/waitlist` | 🔒 | Entra na fila de um horário |
+| `GET` | `/waitlist?resourceId=` | 🔒 | Lista a fila com posição |
+| `DELETE` | `/waitlist/:id` | 🔒 | Sai da fila |
 
-Erros padronizados: **400** (validação), **404** (não encontrado), **409** (conflito), **500** (inesperado).
+🔒 = exige token. Erros padronizados: **400** (validação), **401** (não autenticado), **403** (sem permissão), **404** (não encontrado), **409** (conflito), **500** (inesperado).
 
 ---
 
 ## 🖥️ Frontend
 
-Uma SPA em **React + Vite** (pasta [`web/`](web/)) dá uma visualização do sistema funcionando: grade de disponibilidade por quadra/dia, criar e cancelar reservas, fila de espera com promoção automática, e um **botão que dispara N reservas simultâneas** mostrando ao vivo "1 criada + N-1 conflito".
+Uma SPA em **React + Vite** (pasta [`web/`](web/)) dá uma visualização do sistema funcionando: **login/registro**, grade de disponibilidade por quadra/dia, criar e cancelar reservas, fila de espera com promoção automática, e um **botão que dispara N reservas simultâneas** mostrando ao vivo "1 criada + N-1 conflito".
 
-A API expõe `GET /resources`, `GET /users` e habilita CORS pra a SPA consumi-la.
+O token JWT é guardado no `localStorage` e enviado em cada requisição; a sessão é restaurada no reload via `GET /auth/me`. A API habilita CORS pra a SPA consumi-la. Conta demo: `cadu@reservaquadra.dev` / `senha123`.
 
 ## 🚀 Como rodar
 

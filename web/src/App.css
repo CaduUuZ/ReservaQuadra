@@ -21,6 +21,116 @@ header h1 {
   color: var(--text-dim);
   font-size: 14px;
 }
+.user-box {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+/* Boot / carregando */
+.boot {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+}
+
+/* --- Tela de login / registro --- */
+.auth-wrap {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 28px;
+  text-align: center;
+}
+.auth-card h1 {
+  margin: 0;
+  font-size: 26px;
+  color: var(--text-h);
+}
+.auth-sub {
+  color: var(--text-dim);
+  margin: 6px 0 22px;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+.auth-form input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 15px;
+}
+.auth-form button[type="submit"] {
+  margin-top: 6px;
+  background: var(--accent);
+  color: #06210f;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  padding: 11px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.auth-form button[type="submit"]:disabled {
+  opacity: 0.6;
+}
+.auth-error {
+  color: var(--busy);
+  font-size: 13px;
+  margin: 0;
+}
+.auth-toggle {
+  margin: 18px 0 0;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+.auth-toggle button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0;
+}
+.auth-hint {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.auth-hint code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--text-h);
+}
 
 /* Controles (selects + data) */
 .controls {
