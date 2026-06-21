@@ -3,6 +3,7 @@
 import { Prisma } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
 import { ConflictError, NotFoundError } from "../errors.js";
+import { isForeignKeyViolation, isOverlapConflict } from "../pg-errors.js";
 
 interface CreateBookingInput {
   resourceId: string;
@@ -15,30 +16,6 @@ interface ListBookingFilters {
   userId?: string;
   resourceId?: string;
   date?: Date; // se vier, filtra reservas que começam naquele dia
-}
-
-// No Prisma 7 (driver adapter), erros de constraint do banco chegam como
-// DriverAdapterError, com o código nativo do Postgres em error.cause.code.
-// Pegar esse código é bem mais robusto que confiar no tipo do erro do Prisma.
-function pgErrorCode(error: unknown): string | undefined {
-  const cause = (error as { cause?: { code?: string; originalCode?: string } })?.cause;
-  return cause?.code ?? cause?.originalCode;
-}
-
-// 23P01 = exclusion_violation -> nossa constraint de sobreposição de horário.
-function isOverlapConflict(error: unknown): boolean {
-  if (pgErrorCode(error) === "23P01") return true;
-  const msg = error instanceof Error ? error.message : String(error);
-  return msg.includes("bookings_no_overlap");
-}
-
-// 23503 (Postgres) ou P2003 (Prisma) = foreign key violation ->
-// a quadra ou o usuário informado não existe.
-function isForeignKeyViolation(error: unknown): boolean {
-  if (pgErrorCode(error) === "23503") return true;
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003"
-  );
 }
 
 export async function createBooking(input: CreateBookingInput) {
@@ -88,17 +65,50 @@ export async function listBookings(filters: ListBookingFilters) {
   });
 }
 
-export async function deleteBooking(id: string) {
-  try {
-    return await prisma.booking.delete({ where: { id } });
-  } catch (error) {
-    // P2025 = registro não encontrado para deletar.
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2025"
-    ) {
-      throw new NotFoundError("Reserva não encontrada");
+// Cancela uma reserva e, se houver fila para AQUELE mesmo horário, promove
+// automaticamente o primeiro da fila (FIFO) a uma nova reserva.
+// Tudo numa única transação + advisory lock por quadra: ou cancela-e-promove
+// junto, ou nada acontece (atômico), e sem corrida com outros createBooking.
+export async function cancelBooking(id: string) {
+  return prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({ where: { id } });
+    if (!booking) throw new NotFoundError("Reserva não encontrada");
+
+    // Serializa por quadra (mesma estratégia do createBooking).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${booking.resourceId}))`;
+
+    await tx.booking.delete({ where: { id } });
+
+    // Procura o próximo da fila para o MESMO horário exato.
+    const next = await tx.waitlistEntry.findFirst({
+      where: {
+        resourceId: booking.resourceId,
+        startsAt: booking.startsAt,
+        endsAt: booking.endsAt,
+        status: "WAITING",
+      },
+      orderBy: { createdAt: "asc" }, // mais antigo primeiro = FIFO
+    });
+
+    if (!next) {
+      return { cancelledId: id, promotedBooking: null };
     }
-    throw error;
-  }
+
+    // Promove: cria a reserva para o usuário da fila (o horário acabou de vagar,
+    // então não há conflito) e marca a entrada como PROMOTED.
+    const promotedBooking = await tx.booking.create({
+      data: {
+        resourceId: next.resourceId,
+        userId: next.userId,
+        startsAt: next.startsAt,
+        endsAt: next.endsAt,
+      },
+    });
+    await tx.waitlistEntry.update({
+      where: { id: next.id },
+      data: { status: "PROMOTED" },
+    });
+
+    return { cancelledId: id, promotedBooking };
+  });
 }

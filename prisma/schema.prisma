@@ -12,23 +12,50 @@ datasource db {
 
 // Usuário que faz reservas.
 model User {
-  id        String    @id @default(uuid()) @db.Uuid
+  id        String          @id @default(uuid()) @db.Uuid
   name      String
-  email     String    @unique
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  email     String          @unique
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   bookings  Booking[]
+  waitlist  WaitlistEntry[]
 
   @@map("users")
 }
 
 // A quadra (o recurso que é reservado).
 model Resource {
-  id        String    @id @default(uuid()) @db.Uuid
+  id        String          @id @default(uuid()) @db.Uuid
   name      String
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   bookings  Booking[]
+  waitlist  WaitlistEntry[]
 
   @@map("resources")
+}
+
+// Situação de uma entrada na fila de espera.
+enum WaitlistStatus {
+  WAITING // aguardando uma vaga
+  PROMOTED // virou reserva (alguém cancelou e esta entrada foi promovida)
+  CANCELLED // o usuário saiu da fila
+}
+
+// Fila de espera: usuário que quer um horário já ocupado. Quando a reserva
+// daquele horário é cancelada, o primeiro WAITING (mais antigo) é promovido.
+model WaitlistEntry {
+  id         String         @id @default(uuid()) @db.Uuid
+  resource   Resource       @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resourceId String         @map("resource_id") @db.Uuid
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String         @map("user_id") @db.Uuid
+  startsAt   DateTime       @map("starts_at") @db.Timestamptz(6)
+  endsAt     DateTime       @map("ends_at") @db.Timestamptz(6)
+  status     WaitlistStatus @default(WAITING)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Índice pensado pra busca do "próximo da fila": mesma quadra+horário, status WAITING.
+  @@index([resourceId, startsAt, endsAt, status])
+  @@map("waitlist_entries")
 }
 
 // A reserva: uma quadra ocupada por um usuário em um intervalo de tempo.

@@ -41,6 +41,11 @@ export async function list(req: Request, res: Response) {
 
 export async function remove(req: Request, res: Response) {
   const { id } = idSchema.parse(req.params);
-  await bookingService.deleteBooking(id);
-  res.status(204).send(); // 204 No Content: cancelou com sucesso, sem corpo.
+  const result = await bookingService.cancelBooking(id);
+  // 200 (em vez de 204) porque o cancelamento pode promover alguém da fila —
+  // devolvemos no corpo se uma nova reserva foi criada automaticamente.
+  res.json({
+    cancelled: result.cancelledId,
+    promoted: result.promotedBooking,
+  });
 }

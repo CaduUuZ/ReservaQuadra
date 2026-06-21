@@ -5,6 +5,7 @@ import { prisma } from "../src/db/prisma.js";
 
 // IDs fixos pra facilitar testes manuais e o load test.
 const USER_ID = "22222222-2222-2222-2222-222222222222";
+const USER_ID_2 = "44444444-4444-4444-4444-444444444444";
 const QUADRA_A = "11111111-1111-1111-1111-111111111111";
 const QUADRA_B = "33333333-3333-3333-3333-333333333333";
 
@@ -13,6 +14,12 @@ async function main() {
     where: { id: USER_ID },
     update: {},
     create: { id: USER_ID, name: "Cadu", email: "cadu@reservaquadra.dev" },
+  });
+
+  await prisma.user.upsert({
+    where: { id: USER_ID_2 },
+    update: {},
+    create: { id: USER_ID_2, name: "Bia", email: "bia@reservaquadra.dev" },
   });
 
   const resources = await Promise.all([

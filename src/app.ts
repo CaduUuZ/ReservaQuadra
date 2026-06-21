@@ -2,6 +2,7 @@ import express from "express";
 import { bookingRouter } from "./routes/booking.routes.js";
 import { resourceRouter } from "./routes/resource.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
+import { waitlistRouter } from "./routes/waitlist.routes.js";
 import { errorHandler } from "./middlewares/error-handler.js";
 
 export const app = express();
@@ -13,6 +14,7 @@ app.use(express.json());
 app.use("/health", healthRouter);
 app.use("/resources", resourceRouter);
 app.use("/bookings", bookingRouter);
+app.use("/waitlist", waitlistRouter);
 
 // Rota não encontrada -> 404 padronizado.
 app.use((_req, res) => {
