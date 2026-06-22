@@ -231,6 +231,45 @@ function BookingItem({
     }
   };
 
+  const randomize = async (teams: number) => {
+    try {
+      await api.randomizeTeams(booking.id, teams);
+      await onChanged();
+      flash("success", `Times sorteados! ⚖️`);
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro ao sortear");
+    }
+  };
+
+  const clearTeams = async () => {
+    try {
+      await api.clearTeams(booking.id);
+      await onChanged();
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro");
+    }
+  };
+
+  const hasTeams = parts.some((p) => p.team != null);
+
+  // Linha de um participante (reusada na lista plana e na agrupada por time).
+  const renderParticipant = (p: (typeof parts)[number]) => (
+    <li key={p.id}>
+      <span>
+        {p.user ? p.user.name : <em>{p.guestName} (convidado)</em>}
+        {p.userId === booking.userId && " 👑"}
+      </span>
+      {isOwner && p.userId !== booking.userId && (
+        <button className="x" title="remover" onClick={() => removeParticipant(p.id)}>
+          ×
+        </button>
+      )}
+    </li>
+  );
+
+  // Times presentes, ordenados (1, 2, 3...).
+  const teamNumbers = [...new Set(parts.map((p) => p.team).filter((t): t is number => t != null))].sort();
+
   return (
     <div className="game">
       <div className="game-head">
@@ -244,31 +283,45 @@ function BookingItem({
 
       {open && (
         <div className="game-body">
-          <ul className="part-list">
-            {parts.map((p) => (
-              <li key={p.id}>
-                <span>
-                  {p.user ? p.user.name : <em>{p.guestName} (convidado)</em>}
-                  {p.userId === booking.userId && " 👑"}
-                </span>
-                {isOwner && p.userId !== booking.userId && (
-                  <button className="x" title="remover" onClick={() => removeParticipant(p.id)}>
-                    ×
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {isOwner && (
-            <div className="add-guest">
-              <input
-                placeholder="nome do convidado"
-                value={guest}
-                onChange={(e) => setGuest(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addGuest()}
-              />
-              <button onClick={addGuest}>+ convidado</button>
+          {hasTeams ? (
+            <div className="teams">
+              {teamNumbers.map((t) => (
+                <div key={t} className={`team team-${t}`}>
+                  <h4>Time {t}</h4>
+                  <ul className="part-list">
+                    {parts.filter((p) => p.team === t).map(renderParticipant)}
+                  </ul>
+                </div>
+              ))}
             </div>
+          ) : (
+            <ul className="part-list">{parts.map(renderParticipant)}</ul>
+          )}
+
+          {isOwner && (
+            <>
+              <div className="add-guest">
+                <input
+                  placeholder="nome do convidado"
+                  value={guest}
+                  onChange={(e) => setGuest(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addGuest()}
+                />
+                <button onClick={addGuest}>+ convidado</button>
+              </div>
+
+              {parts.length >= 2 && (
+                <div className="teams-bar">
+                  <span>⚖️ Sortear times:</span>
+                  {[2, 3, 4].map((n) => (
+                    <button key={n} onClick={() => randomize(n)}>{n}</button>
+                  ))}
+                  {hasTeams && (
+                    <button className="clear" onClick={clearTeams}>limpar</button>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

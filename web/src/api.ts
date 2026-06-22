@@ -92,6 +92,15 @@ export const api = {
       method: "DELETE",
     }),
 
+  // --- Times ---
+  randomizeTeams: (bookingId: string, teams: number) =>
+    request<Participant[]>(`/bookings/${bookingId}/teams/randomize`, {
+      method: "POST",
+      body: JSON.stringify({ teams }),
+    }),
+  clearTeams: (bookingId: string) =>
+    request<void>(`/bookings/${bookingId}/teams`, { method: "DELETE" }),
+
   // --- Fila de espera ---
   listWaitlist: (params: { resourceId?: string } = {}) => {
     const q = new URLSearchParams(params as Record<string, string>).toString();

@@ -2,7 +2,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { startTestDatabase } from "./helpers/testDb.js";
-import { ConflictError, NotFoundError, UnauthorizedError } from "../src/errors.js";
+import { ConflictError, NotFoundError, UnauthorizedError, ValidationError } from "../src/errors.js";
 
 // Tipos só pra IDE; os módulos reais são importados dinamicamente no before().
 let container: StartedPostgreSqlContainer;
@@ -182,6 +182,38 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
     // A CHECK constraint do banco rejeita "nem usuário, nem convidado".
     await assert.rejects(
       prisma.participant.create({ data: { bookingId: booking.id } }),
+    );
+  });
+
+  it("sorteia os participantes em times equilibrados", async () => {
+    const booking = await bookingService.createBooking({
+      resourceId: RESOURCE,
+      userId: ALICE,
+      startsAt: S,
+      endsAt: E,
+    });
+    // dono (1) + 3 convidados = 4 participantes
+    for (const n of ["A", "B", "C"]) {
+      await participantService.addParticipant(booking.id, ALICE, { guestName: n });
+    }
+    const parts = await participantService.randomizeTeams(booking.id, ALICE, 2);
+
+    assert.equal(parts.length, 4);
+    assert.equal(parts.filter((p) => p.team === 1).length, 2);
+    assert.equal(parts.filter((p) => p.team === 2).length, 2);
+  });
+
+  it("sortear com participantes insuficientes lança ValidationError (400)", async () => {
+    const booking = await bookingService.createBooking({
+      resourceId: RESOURCE,
+      userId: ALICE,
+      startsAt: S,
+      endsAt: E,
+    });
+    // só o dono (1 participante) -> não dá pra 2 times
+    await assert.rejects(
+      participantService.randomizeTeams(booking.id, ALICE, 2),
+      (err) => err instanceof ValidationError && err.statusCode === 400,
     );
   });
 });

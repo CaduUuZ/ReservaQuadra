@@ -164,6 +164,10 @@ sequenceDiagram
 
 Uma reserva é um **jogo**: tem um **dono** (logado, responde pela quadra) e uma lista de **participantes**. Cada participante é um **usuário cadastrado** ou um **convidado** (só um nome, sem conta) — login é obrigatório só pra quem reserva, não pra quem joga. Uma **CHECK constraint** no banco garante que todo participante é exatamente um dos dois (`user_id` XOR `guest_name`). O dono entra como participante automaticamente ao criar o jogo.
 
+## ⚖️ Times
+
+O dono pode **sortear** os participantes em 2 a 4 times. O algoritmo embaralha (Fisher-Yates) e distribui em rodízio, então os times ficam equilibrados (tamanhos diferindo no máximo em 1). A escalação é persistida (campo `team`) e numa transação — todos recebem time ou ninguém. Dá pra re-sortear ou limpar.
+
 ## 🔐 Autenticação
 
 JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). No login/registro a API devolve um token; o cliente o envia no header `Authorization: Bearer <token>`. As rotas de reserva/fila são protegidas, e o `userId` vem **do token** — ninguém reserva em nome de outro. Cancelamento exige ser o **dono** da reserva (403 caso contrário).
@@ -182,6 +186,8 @@ JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). 
 | `DELETE` | `/bookings/:id` | 🔒 | Cancela (e promove a fila, se houver) |
 | `POST` | `/bookings/:id/participants` | 🔒 | Adiciona participante (usuário ou convidado) |
 | `DELETE` | `/bookings/:id/participants/:pid` | 🔒 | Remove participante (só o dono) |
+| `POST` | `/bookings/:id/teams/randomize` | 🔒 | Sorteia os participantes em N times (2–4) |
+| `DELETE` | `/bookings/:id/teams` | 🔒 | Desfaz a escalação |
 | `POST` | `/waitlist` | 🔒 | Entra na fila de um horário |
 | `GET` | `/waitlist?resourceId=` | 🔒 | Lista a fila com posição |
 | `DELETE` | `/waitlist/:id` | 🔒 | Sai da fila |

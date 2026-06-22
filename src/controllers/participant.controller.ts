@@ -30,3 +30,20 @@ export async function remove(req: Request, res: Response) {
   await participantService.removeParticipant(id, participantId, req.userId!);
   res.status(204).send();
 }
+
+const randomizeSchema = z.object({
+  teams: z.coerce.number().int().min(2).max(4).default(2),
+});
+
+export async function randomizeTeams(req: Request, res: Response) {
+  const { id } = bookingIdSchema.parse(req.params);
+  const { teams } = randomizeSchema.parse(req.body ?? {});
+  const participants = await participantService.randomizeTeams(id, req.userId!, teams);
+  res.json(participants);
+}
+
+export async function clearTeams(req: Request, res: Response) {
+  const { id } = bookingIdSchema.parse(req.params);
+  await participantService.clearTeams(id, req.userId!);
+  res.status(204).send();
+}
