@@ -6,6 +6,7 @@ const registerSchema = z.object({
   name: z.string().min(2, "nome muito curto"),
   email: z.email("e-mail inválido"),
   password: z.string().min(6, "a senha precisa de pelo menos 6 caracteres"),
+  role: z.enum(["JOGADOR", "EMPRESA"]).optional(), // padrão JOGADOR no service
 });
 
 const loginSchema = z.object({

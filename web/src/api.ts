@@ -59,18 +59,37 @@ interface SlotInput {
   sport?: string; // só usado na criação de reserva
 }
 
+interface ResourceInput {
+  name: string;
+  sports: string[];
+  surface: string;
+  pricePerHour?: number | null;
+}
+
 export const api = {
   // --- Auth ---
-  register: (input: { name: string; email: string; password: string }) =>
+  register: (input: { name: string; email: string; password: string; role?: string }) =>
     request<AuthResponse>("/auth/register", { method: "POST", body: JSON.stringify(input) }),
   login: (input: { email: string; password: string }) =>
     request<AuthResponse>("/auth/login", { method: "POST", body: JSON.stringify(input) }),
   me: () => request<User>("/auth/me"),
 
+  // --- "Eu" (jogos e estatísticas do usuário logado) ---
+  myBookings: () => request<Booking[]>("/me/bookings"),
+  myStats: () =>
+    request<{ totalGames: number; daysPlayed: number; weekStreak: number }>("/me/stats"),
+
   // --- Recursos ---
   listResources: () => request<Resource[]>("/resources"),
   getAvailability: (resourceId: string, date: string) =>
     request<Availability>(`/resources/${resourceId}/availability?date=${date}`),
+
+  // --- Gestão de quadras (empresa dona) ---
+  myResources: () => request<Resource[]>("/resources/mine"),
+  createResource: (input: ResourceInput) =>
+    request<Resource>("/resources", { method: "POST", body: JSON.stringify(input) }),
+  updateResource: (id: string, input: ResourceInput) =>
+    request<Resource>(`/resources/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
 
   // --- Reservas (o userId vem do token, não do corpo) ---
   listBookings: (params: { resourceId?: string; date?: string } = {}) => {

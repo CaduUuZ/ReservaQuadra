@@ -47,12 +47,14 @@ erDiagram
     RESOURCES ||--o{ WAITLIST_ENTRIES : tem
     BOOKINGS ||--o{ PARTICIPANTS : tem
     USERS |o--o{ PARTICIPANTS : "joga (opcional)"
+    USERS |o--o{ RESOURCES : "é dona (empresa)"
 
     USERS {
         uuid id PK
         string name
         string email UK
         string password
+        enum role "JOGADOR ou EMPRESA"
     }
     RESOURCES {
         uuid id PK
@@ -60,6 +62,7 @@ erDiagram
         enum sports "esportes aceitos"
         enum surface "tipo de piso"
         int price_per_hour
+        uuid owner_id FK "empresa dona"
     }
     BOOKINGS {
         uuid id PK
@@ -180,6 +183,8 @@ O dono pode **sortear** os participantes em 2 a 4 times. O algoritmo embaralha (
 
 JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). No login/registro a API devolve um token; o cliente o envia no header `Authorization: Bearer <token>`. As rotas de reserva/fila são protegidas, e o `userId` vem **do token** — ninguém reserva em nome de outro. Cancelamento exige ser o **dono** da reserva (403 caso contrário).
 
+Há dois tipos de conta (`role` no token): **JOGADOR** e **EMPRESA**. Empresas cadastram e editam suas próprias quadras (esportes, piso, preço) — protegido por um middleware `requireRole("EMPRESA")` + checagem de dono. Conta empresa demo: `arena@reservaquadra.dev` / `senha123`.
+
 ## 🔌 API
 
 | Método | Rota | 🔒 | Descrição |
@@ -187,8 +192,12 @@ JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). 
 | `POST` | `/auth/register` | | Cria conta, devolve token |
 | `POST` | `/auth/login` | | Autentica, devolve token |
 | `GET` | `/auth/me` | 🔒 | Perfil do usuário logado |
+| `GET` | `/me/bookings` | 🔒 | Meus jogos (como dono ou participante) |
+| `GET` | `/me/stats` | 🔒 | Total de jogos, dias jogados e streak de semanas |
 | `GET` | `/health` | | Healthcheck (app + banco) |
 | `GET` | `/resources` · `/resources/:id/availability?date=` | 🔒 | Quadras e disponibilidade |
+| `GET` | `/resources/mine` | 🔒🏢 | Quadras da empresa logada |
+| `POST` `PATCH` | `/resources` · `/resources/:id` | 🔒🏢 | Empresa cria/edita quadra |
 | `POST` | `/bookings` | 🔒 | Cria reserva/jogo (`409` se conflitar) |
 | `GET` | `/bookings?resourceId=&date=` | 🔒 | Lista jogos (com participantes) |
 | `DELETE` | `/bookings/:id` | 🔒 | Cancela (e promove a fila, se houver) |
@@ -208,7 +217,7 @@ JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). 
 
 Uma SPA em **React + Vite** (pasta [`web/`](web/)) dá uma visualização do sistema funcionando: **login/registro**, grade de disponibilidade por quadra/dia, criar e cancelar reservas, fila de espera com promoção automática, e um **botão que dispara N reservas simultâneas** mostrando ao vivo "1 criada + N-1 conflito".
 
-Dá pra **selecionar vários horários** e reservar de uma vez: blocos contíguos viram uma reserva só (10h+11h → 10h–12h), separados viram reservas distintas. As datas aparecem em formato amigável ("Segunda, dia 22 · 19h–20h").
+Dá pra **selecionar vários horários** e reservar de uma vez: blocos contíguos viram uma reserva só (10h+11h → 10h–12h), separados viram reservas distintas. As datas aparecem em formato amigável ("Segunda, dia 22 · 19h–20h"). Há também uma aba **"Meus jogos"** com seus próximos jogos, histórico e um painel de estatísticas (jogos disputados, dias jogados e **streak de semanas seguidas** 🔥).
 
 O token JWT é guardado no `localStorage` e enviado em cada requisição; a sessão é restaurada no reload via `GET /auth/me`. A API habilita CORS pra a SPA consumi-la. Conta demo: `cadu@reservaquadra.dev` / `senha123`.
 

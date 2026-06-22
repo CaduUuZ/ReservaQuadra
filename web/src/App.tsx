@@ -28,6 +28,8 @@ const SURFACE_LABELS: Record<string, string> = {
   CIMENTO: "Cimento",
   GRAMA: "Grama",
 };
+const ALL_SPORTS = ["FUTEBOL", "VOLEI", "TENIS", "BEACH_TENNIS", "FUTEVOLEI", "BASQUETE"];
+const ALL_SURFACES = ["AREIA", "SAIBRO", "SINTETICO", "CIMENTO", "GRAMA"];
 const fmtPrice = (cents: number | null) =>
   cents == null ? "" : `R$ ${(cents / 100).toFixed(2).replace(".", ",")}/h`;
 
@@ -66,6 +68,7 @@ export default function App() {
   // Esporte escolhido pro próximo jogo (dentre os que a quadra aceita).
   const [sport, setSport] = useState<string>("");
   const [sportOpen, setSportOpen] = useState(false);
+  const [view, setView] = useState<"book" | "home" | "courts">("book");
 
   const flash = (kind: NonNullable<Toast>["kind"], text: string) => {
     setToast({ kind, text });
@@ -195,13 +198,31 @@ export default function App() {
     <div className="app">
       <header>
         <h1>🏐 ReservaQuadra</h1>
-        <span className="subtitle">painel de reservas · concorrência garantida pelo banco</span>
+        <nav className="nav">
+          <button className={view === "book" ? "active" : ""} onClick={() => setView("book")}>
+            Reservar
+          </button>
+          <button className={view === "home" ? "active" : ""} onClick={() => setView("home")}>
+            Meus jogos
+          </button>
+          {user.role === "EMPRESA" && (
+            <button className={view === "courts" ? "active" : ""} onClick={() => setView("courts")}>
+              Minhas quadras
+            </button>
+          )}
+        </nav>
         <div className="user-box">
           <span>👤 {user.name}</span>
           <button className="ghost" onClick={logout}>sair</button>
         </div>
       </header>
 
+      {view === "home" ? (
+        <HomeView currentUserId={user.id} flash={flash} />
+      ) : view === "courts" ? (
+        <CourtsView flash={flash} />
+      ) : (
+      <>
       <div className="controls">
         <label>
           Quadra
@@ -319,9 +340,241 @@ export default function App() {
           flash={flash}
         />
       </main>
+      </>
+      )}
 
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
     </div>
+  );
+}
+
+// --- Home: estatísticas + meus jogos (próximos e histórico) ---
+function HomeView({
+  currentUserId,
+  flash,
+}: {
+  currentUserId: string;
+  flash: (kind: "success" | "error" | "info", text: string) => void;
+}) {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [stats, setStats] = useState<{
+    totalGames: number;
+    daysPlayed: number;
+    weekStreak: number;
+  } | null>(null);
+
+  const load = useCallback(async () => {
+    const [bk, st] = await Promise.all([api.myBookings(), api.myStats()]);
+    setBookings(bk);
+    setStats(st);
+  }, []);
+
+  useEffect(() => {
+    load().catch(() => {});
+  }, [load]);
+
+  const now = Date.now();
+  const upcoming = bookings.filter((b) => new Date(b.startsAt).getTime() >= now);
+  // Histórico: passados, do mais recente pro mais antigo.
+  const past = bookings.filter((b) => new Date(b.startsAt).getTime() < now).reverse();
+
+  const cancel = async (b: Booking) => {
+    try {
+      await api.cancelBooking(b.id);
+      await load();
+      flash("info", "Reserva cancelada.");
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro ao cancelar");
+    }
+  };
+
+  const renderList = (list: Booking[], emptyMsg: string) => (
+    <div className="games">
+      {list.length === 0 && <p className="empty">{emptyMsg}</p>}
+      {list.map((b) => (
+        <BookingItem
+          key={b.id}
+          booking={b}
+          currentUserId={currentUserId}
+          onCancel={() => cancel(b)}
+          onChanged={load}
+          flash={flash}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="home">
+      <div className="stats">
+        <div className="stat">
+          <span className="big">🔥 {stats?.weekStreak ?? 0}</span>
+          <span className="lbl">semanas seguidas</span>
+        </div>
+        <div className="stat">
+          <span className="big">🎮 {stats?.totalGames ?? 0}</span>
+          <span className="lbl">jogos disputados</span>
+        </div>
+        <div className="stat">
+          <span className="big">📅 {stats?.daysPlayed ?? 0}</span>
+          <span className="lbl">dias jogados</span>
+        </div>
+      </div>
+
+      <section className="card">
+        <h2>Próximos jogos</h2>
+        {renderList(upcoming, "Nenhum jogo futuro — bora marcar?")}
+      </section>
+
+      <section className="card">
+        <h2>Histórico</h2>
+        {renderList(past, "Você ainda não jogou.")}
+      </section>
+    </div>
+  );
+}
+
+// --- Minhas quadras (empresa): listar + criar/editar ---
+function CourtsView({
+  flash,
+}: {
+  flash: (kind: "success" | "error" | "info", text: string) => void;
+}) {
+  const [courts, setCourts] = useState<Resource[]>([]);
+  const [editing, setEditing] = useState<Resource | "new" | null>(null);
+
+  const load = useCallback(async () => {
+    setCourts(await api.myResources());
+  }, []);
+  useEffect(() => {
+    load().catch(() => {});
+  }, [load]);
+
+  return (
+    <div className="home">
+      <section className="card">
+        <div className="courts-head">
+          <h2>Minhas quadras</h2>
+          <button className="confirm" onClick={() => setEditing("new")}>+ Nova quadra</button>
+        </div>
+        {courts.length === 0 && <p className="empty">Você ainda não cadastrou quadras.</p>}
+        <div className="games">
+          {courts.map((c) => (
+            <div key={c.id} className="court-row">
+              <div>
+                <b>{c.name}</b>
+                <div className="court-sub">
+                  {c.sports.map((s) => SPORT_LABELS[s] ?? s).join(" · ")} ·{" "}
+                  {SURFACE_LABELS[c.surface] ?? c.surface}
+                  {c.pricePerHour != null && ` · ${fmtPrice(c.pricePerHour)}`}
+                </div>
+              </div>
+              <button className="ghost" onClick={() => setEditing(c)}>editar</button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {editing && (
+        <CourtForm
+          court={editing === "new" ? null : editing}
+          flash={flash}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            await load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CourtForm({
+  court,
+  flash,
+  onClose,
+  onSaved,
+}: {
+  court: Resource | null;
+  flash: (kind: "success" | "error" | "info", text: string) => void;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [name, setName] = useState(court?.name ?? "");
+  const [sports, setSports] = useState<string[]>(court?.sports ?? []);
+  const [surface, setSurface] = useState(court?.surface ?? "SINTETICO");
+  const [price, setPrice] = useState(
+    court?.pricePerHour != null ? String(court.pricePerHour / 100) : "",
+  );
+  const [busy, setBusy] = useState(false);
+
+  const toggleSport = (s: string) =>
+    setSports((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+
+  const save = async () => {
+    if (name.trim().length < 2) return flash("error", "Dê um nome à quadra.");
+    if (sports.length === 0) return flash("error", "Escolha ao menos um esporte.");
+    setBusy(true);
+    const input = {
+      name: name.trim(),
+      sports,
+      surface,
+      pricePerHour: price ? Math.round(Number(price) * 100) : null,
+    };
+    try {
+      if (court) await api.updateResource(court.id, input);
+      else await api.createResource(input);
+      flash("success", court ? "Quadra atualizada ✓" : "Quadra criada ✓");
+      await onSaved();
+    } catch (e) {
+      flash("error", e instanceof ApiError ? e.message : "Erro ao salvar");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card court-form">
+      <h2>{court ? "Editar quadra" : "Nova quadra"}</h2>
+      <label className="fld">
+        Nome
+        <input value={name} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <div className="fld">
+        Esportes aceitos
+        <div className="sport-chips">
+          {ALL_SPORTS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`sport-chip ${sports.includes(s) ? "active" : ""}`}
+              onClick={() => toggleSport(s)}
+            >
+              {SPORT_LABELS[s]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <label className="fld">
+        Piso
+        <select value={surface} onChange={(e) => setSurface(e.target.value)}>
+          {ALL_SURFACES.map((s) => (
+            <option key={s} value={s}>{SURFACE_LABELS[s]}</option>
+          ))}
+        </select>
+      </label>
+      <label className="fld">
+        Preço por hora (R$)
+        <input type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} />
+      </label>
+      <div className="form-actions">
+        <button className="clear" onClick={onClose}>cancelar</button>
+        <button className="confirm" disabled={busy} onClick={save}>
+          {busy ? "..." : "salvar"}
+        </button>
+      </div>
+    </section>
   );
 }
 

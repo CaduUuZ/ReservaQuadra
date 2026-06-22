@@ -8,6 +8,7 @@ export function AuthPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("JOGADOR");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +20,7 @@ export function AuthPage() {
     setBusy(true);
     try {
       if (isLogin) await login(email, password);
-      else await register(name, email, password);
+      else await register(name, email, password, role);
       // Sucesso: o AuthProvider seta o user e o App troca de tela sozinho.
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Algo deu errado");
@@ -36,10 +37,28 @@ export function AuthPage() {
 
         <form onSubmit={submit} className="auth-form">
           {!isLogin && (
-            <label>
-              Nome
-              <input value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
-            </label>
+            <>
+              <label>
+                Nome
+                <input value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
+              </label>
+              <div className="role-pick">
+                <button
+                  type="button"
+                  className={role === "JOGADOR" ? "active" : ""}
+                  onClick={() => setRole("JOGADOR")}
+                >
+                  🏐 Sou jogador
+                </button>
+                <button
+                  type="button"
+                  className={role === "EMPRESA" ? "active" : ""}
+                  onClick={() => setRole("EMPRESA")}
+                >
+                  🏢 Tenho quadra
+                </button>
+              </div>
+            </>
           )}
           <label>
             E-mail

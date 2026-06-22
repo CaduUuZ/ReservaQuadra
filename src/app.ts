@@ -7,6 +7,7 @@ import { resourceRouter } from "./routes/resource.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { waitlistRouter } from "./routes/waitlist.routes.js";
 import { userRouter } from "./routes/user.routes.js";
+import { meRouter } from "./routes/me.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { authMiddleware } from "./middlewares/auth.js";
 import { errorHandler } from "./middlewares/error-handler.js";
@@ -33,6 +34,7 @@ app.use("/resources", authMiddleware, resourceRouter);
 app.use("/bookings", authMiddleware, bookingRouter);
 app.use("/waitlist", authMiddleware, waitlistRouter);
 app.use("/users", authMiddleware, userRouter);
+app.use("/me", authMiddleware, meRouter);
 
 // Rota não encontrada -> 404 padronizado.
 app.use((_req, res) => {

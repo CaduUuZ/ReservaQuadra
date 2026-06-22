@@ -6,7 +6,7 @@ interface AuthValue {
   user: User | null;
   loading: boolean; // true enquanto restaura a sessão no boot
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user);
   };
 
-  const register = async (name: string, email: string, password: string) => {
-    const { token, user } = await api.register({ name, email, password });
+  const register = async (name: string, email: string, password: string, role: string) => {
+    const { token, user } = await api.register({ name, email, password, role });
     tokenStore.set(token);
     setUser(user);
   };

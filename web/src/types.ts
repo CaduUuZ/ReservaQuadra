@@ -4,6 +4,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  role: string; // "JOGADOR" ou "EMPRESA"
 }
 
 export interface Resource {

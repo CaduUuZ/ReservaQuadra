@@ -21,6 +21,25 @@ header h1 {
   color: var(--text-dim);
   font-size: 14px;
 }
+.nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 24px;
+}
+.nav button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 15px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.nav button.active {
+  background: var(--card);
+  color: var(--text-h);
+  font-weight: 600;
+}
 .user-box {
   margin-left: auto;
   display: flex;
@@ -28,6 +47,44 @@ header h1 {
   gap: 10px;
   font-size: 14px;
   color: var(--text-h);
+}
+
+/* Home / Meus jogos */
+.home {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+}
+.stat .big {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.stat .lbl {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+@media (max-width: 600px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Boot / carregando */
@@ -104,6 +161,100 @@ header h1 {
   color: var(--busy);
   font-size: 13px;
   margin: 0;
+}
+.role-pick {
+  display: flex;
+  gap: 8px;
+}
+.role-pick button {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.role-pick button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+  font-weight: 600;
+}
+
+/* Gestão de quadras (empresa) */
+.courts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.courts-head .confirm {
+  background: var(--accent);
+  color: #06210f;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.court-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.court-row b {
+  color: var(--text-h);
+}
+.court-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.court-form .fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.court-form input,
+.court-form select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-h);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 15px;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.form-actions .clear {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+.form-actions .confirm {
+  background: var(--accent);
+  color: #06210f;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-weight: 700;
+  cursor: pointer;
 }
 .auth-toggle {
   margin: 18px 0 0;

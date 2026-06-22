@@ -2,7 +2,13 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { startTestDatabase } from "./helpers/testDb.js";
-import { ConflictError, NotFoundError, UnauthorizedError, ValidationError } from "../src/errors.js";
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from "../src/errors.js";
 
 // Tipos só pra IDE; os módulos reais são importados dinamicamente no before().
 let container: StartedPostgreSqlContainer;
@@ -12,6 +18,7 @@ let waitlistService: typeof import("../src/services/waitlist.service.js");
 let resourceService: typeof import("../src/services/resource.service.js");
 let authService: typeof import("../src/services/auth.service.js");
 let participantService: typeof import("../src/services/participant.service.js");
+let meService: typeof import("../src/services/me.service.js");
 
 const RESOURCE = "11111111-1111-1111-1111-111111111111";
 const ALICE = "22222222-2222-2222-2222-222222222222";
@@ -29,6 +36,7 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
     resourceService = await import("../src/services/resource.service.js");
     authService = await import("../src/services/auth.service.js");
     participantService = await import("../src/services/participant.service.js");
+    meService = await import("../src/services/me.service.js");
 
     // Dados base que persistem por toda a suíte. (password é coluna obrigatória;
     // aqui um valor qualquer basta, pois estes testes não exercitam login.)
@@ -238,6 +246,48 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
         sport: "VOLEI", // a quadra de teste só aceita FUTEBOL
       }),
       (err) => err instanceof ValidationError && err.statusCode === 400,
+    );
+  });
+
+  it("stats: conta jogos passados e o streak de semanas seguidas", async () => {
+    // 3 jogos passados em 3 semanas consecutivas (segundas-feiras).
+    for (const day of ["2026-06-01", "2026-06-08", "2026-06-15"]) {
+      await bookingService.createBooking({
+        resourceId: RESOURCE,
+        userId: ALICE,
+        startsAt: new Date(`${day}T19:00:00Z`),
+        endsAt: new Date(`${day}T20:00:00Z`),
+      });
+    }
+    const stats = await meService.getMyStats(ALICE);
+    assert.equal(stats.totalGames, 3);
+    assert.equal(stats.daysPlayed, 3);
+    assert.equal(stats.weekStreak, 3);
+  });
+
+  it("empresa cria quadra e só o dono pode editá-la (403 pra outro)", async () => {
+    const empresa = await authService.register({
+      name: "Arena",
+      email: "arena@test.dev",
+      password: "senha123",
+      role: "EMPRESA",
+    });
+    const court = await resourceService.createResource(empresa.user.id, {
+      name: "Quadra Nova",
+      sports: ["TENIS"],
+      surface: "SAIBRO",
+      pricePerHour: 5000,
+    });
+    assert.equal(court.ownerId, empresa.user.id);
+
+    // Outro usuário não pode editar a quadra da empresa.
+    await assert.rejects(
+      resourceService.updateResource(court.id, ALICE, {
+        name: "Invadida",
+        sports: ["TENIS"],
+        surface: "SAIBRO",
+      }),
+      (err) => err instanceof ForbiddenError && err.statusCode === 403,
     );
   });
 });

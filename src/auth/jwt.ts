@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 export interface TokenPayload {
   sub: string; // id do usuário
   name: string; // nome (conveniência pra UI)
+  role: string; // JOGADOR ou EMPRESA (pra autorização sem ir ao banco)
 }
 
 const EXPIRES_IN = "7d";

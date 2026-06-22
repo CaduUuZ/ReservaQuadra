@@ -10,16 +10,24 @@ datasource db {
   provider = "postgresql"
 }
 
+// Tipo de conta: quem joga vs quem é dono de quadra.
+enum Role {
+  JOGADOR
+  EMPRESA
+}
+
 // Usuário que faz reservas.
 model User {
   id        String          @id @default(uuid()) @db.Uuid
   name      String
   email     String          @unique
   password  String // hash bcrypt — NUNCA a senha em texto puro
+  role      Role            @default(JOGADOR)
   createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   bookings  Booking[] // reservas das quais é DONO
   waitlist  WaitlistEntry[]
   participations Participant[] // jogos dos quais participa (como usuário cadastrado)
+  ownedResources Resource[] // quadras que esta EMPRESA possui
 
   @@map("users")
 }
@@ -50,10 +58,14 @@ model Resource {
   sports       Sport[] // esportes que a quadra aceita (array de enum no Postgres)
   surface      Surface         @default(SINTETICO) // tipo de piso
   pricePerHour Int? // preço por hora em CENTAVOS (ex: 8000 = R$ 80,00); informativo
+  // Empresa dona da quadra (null = quadra "do sistema", sem dono).
+  owner        User?           @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId      String?         @map("owner_id") @db.Uuid
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   bookings     Booking[]
   waitlist     WaitlistEntry[]
 
+  @@index([ownerId])
   @@map("resources")
 }
 

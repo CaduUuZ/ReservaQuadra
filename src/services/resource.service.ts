@@ -1,6 +1,14 @@
 // Regra de negócio das quadras, incluindo o cálculo de disponibilidade.
+import type { Sport, Surface } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
-import { NotFoundError } from "../errors.js";
+import { ForbiddenError, NotFoundError } from "../errors.js";
+
+interface ResourceInput {
+  name: string;
+  sports: Sport[];
+  surface: Surface;
+  pricePerHour?: number | null;
+}
 
 // Horário de funcionamento e tamanho do bloco (poderia virar config por quadra depois).
 const OPENING_HOUR = 8; // 08:00
@@ -15,6 +23,25 @@ interface Slot {
 
 export async function listResources() {
   return prisma.resource.findMany({ orderBy: { name: "asc" } });
+}
+
+// Quadras de uma empresa específica (as que ela é dona).
+export async function listResourcesByOwner(ownerId: string) {
+  return prisma.resource.findMany({ where: { ownerId }, orderBy: { name: "asc" } });
+}
+
+export async function createResource(ownerId: string, input: ResourceInput) {
+  return prisma.resource.create({ data: { ...input, ownerId } });
+}
+
+// Edita uma quadra — só o dono (a empresa) pode.
+export async function updateResource(id: string, ownerId: string, input: ResourceInput) {
+  const resource = await prisma.resource.findUnique({ where: { id } });
+  if (!resource) throw new NotFoundError("Quadra não encontrada");
+  if (resource.ownerId !== ownerId) {
+    throw new ForbiddenError("Você só pode editar as suas próprias quadras");
+  }
+  return prisma.resource.update({ where: { id }, data: input });
 }
 
 export async function getAvailability(resourceId: string, date: Date) {
