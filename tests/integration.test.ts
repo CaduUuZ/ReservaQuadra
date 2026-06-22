@@ -32,7 +32,7 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
 
     // Dados base que persistem por toda a suíte. (password é coluna obrigatória;
     // aqui um valor qualquer basta, pois estes testes não exercitam login.)
-    await prisma.resource.create({ data: { id: RESOURCE, name: "Quadra A" } });
+    await prisma.resource.create({ data: { id: RESOURCE, name: "Quadra A", sports: ["FUTEBOL"] } });
     await prisma.user.create({ data: { id: ALICE, name: "Alice", email: "alice@test.dev", password: "x" } });
     await prisma.user.create({ data: { id: BOB, name: "Bob", email: "bob@test.dev", password: "x" } });
   }, { timeout: 180_000 }); // subir o container pode demorar na 1ª vez
@@ -213,6 +213,30 @@ describe("ReservaQuadra — integração (Postgres real via Testcontainers)", ()
     // só o dono (1 participante) -> não dá pra 2 times
     await assert.rejects(
       participantService.randomizeTeams(booking.id, ALICE, 2),
+      (err) => err instanceof ValidationError && err.statusCode === 400,
+    );
+  });
+
+  it("aceita esporte que a quadra oferece e grava no jogo", async () => {
+    const booking = await bookingService.createBooking({
+      resourceId: RESOURCE,
+      userId: ALICE,
+      startsAt: S,
+      endsAt: E,
+      sport: "FUTEBOL",
+    });
+    assert.equal(booking.sport, "FUTEBOL");
+  });
+
+  it("rejeita esporte que a quadra não oferece (ValidationError 400)", async () => {
+    await assert.rejects(
+      bookingService.createBooking({
+        resourceId: RESOURCE,
+        userId: ALICE,
+        startsAt: S,
+        endsAt: E,
+        sport: "VOLEI", // a quadra de teste só aceita FUTEBOL
+      }),
       (err) => err instanceof ValidationError && err.statusCode === 400,
     );
   });

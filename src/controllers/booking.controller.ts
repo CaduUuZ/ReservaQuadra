@@ -11,6 +11,9 @@ const createSchema = z
     resourceId: z.guid("resourceId deve ser um UUID"),
     startsAt: z.coerce.date(), // aceita string ISO e converte pra Date
     endsAt: z.coerce.date(),
+    sport: z
+      .enum(["FUTEBOL", "VOLEI", "TENIS", "BEACH_TENNIS", "FUTEVOLEI", "BASQUETE"])
+      .optional(),
   })
   // Regra de negócio simples que não precisa do banco: fim depois do início.
   .refine((d) => d.endsAt > d.startsAt, {

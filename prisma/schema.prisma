@@ -24,13 +24,35 @@ model User {
   @@map("users")
 }
 
+// Esportes que uma quadra pode aceitar / um jogo pode ser.
+enum Sport {
+  FUTEBOL
+  VOLEI
+  TENIS
+  BEACH_TENNIS
+  FUTEVOLEI
+  BASQUETE
+}
+
+// Tipo de piso da quadra.
+enum Surface {
+  AREIA
+  SAIBRO
+  SINTETICO
+  CIMENTO
+  GRAMA
+}
+
 // A quadra (o recurso que é reservado).
 model Resource {
-  id        String          @id @default(uuid()) @db.Uuid
-  name      String
-  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  bookings  Booking[]
-  waitlist  WaitlistEntry[]
+  id           String          @id @default(uuid()) @db.Uuid
+  name         String
+  sports       Sport[] // esportes que a quadra aceita (array de enum no Postgres)
+  surface      Surface         @default(SINTETICO) // tipo de piso
+  pricePerHour Int? // preço por hora em CENTAVOS (ex: 8000 = R$ 80,00); informativo
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  bookings     Booking[]
+  waitlist     WaitlistEntry[]
 
   @@map("resources")
 }
@@ -74,6 +96,7 @@ model Booking {
   // constraint referencia os nomes reais das colunas (starts_at, ends_at, resource_id).
   startsAt   DateTime @map("starts_at") @db.Timestamptz(6)
   endsAt     DateTime @map("ends_at") @db.Timestamptz(6)
+  sport      Sport? // esporte escolhido pra este jogo (dentre os que a quadra aceita)
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   // O "user/userId" acima é o DONO do jogo. Os jogadores (incl. o dono) ficam aqui.
   participants Participant[]

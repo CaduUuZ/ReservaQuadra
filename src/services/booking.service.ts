@@ -1,8 +1,9 @@
 // Regra de negócio das reservas. Esta camada não conhece HTTP:
 // ela fala com o banco (Prisma) e lança erros de domínio quando algo dá errado.
 import { Prisma } from "../generated/prisma/client.js";
+import type { Sport } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
-import { ConflictError, ForbiddenError, NotFoundError } from "../errors.js";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors.js";
 import { isForeignKeyViolation, isOverlapConflict } from "../pg-errors.js";
 
 interface CreateBookingInput {
@@ -10,6 +11,7 @@ interface CreateBookingInput {
   userId: string;
   startsAt: Date;
   endsAt: Date;
+  sport?: Sport; // esporte escolhido (precisa ser aceito pela quadra)
 }
 
 interface ListBookingFilters {
@@ -19,6 +21,15 @@ interface ListBookingFilters {
 }
 
 export async function createBooking(input: CreateBookingInput) {
+  // Se um esporte foi escolhido, ele precisa estar entre os que a quadra aceita.
+  if (input.sport) {
+    const resource = await prisma.resource.findUnique({ where: { id: input.resourceId } });
+    if (!resource) throw new NotFoundError("Quadra não encontrada");
+    if (!resource.sports.includes(input.sport)) {
+      throw new ValidationError("Esta quadra não aceita o esporte selecionado");
+    }
+  }
+
   try {
     // Lock consultivo (advisory) por quadra, dentro de uma transação.
     // Ele serializa as inserções concorrentes da MESMA quadra em uma fila

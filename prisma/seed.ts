@@ -29,13 +29,14 @@ async function main() {
   const resources = await Promise.all([
     prisma.resource.upsert({
       where: { id: QUADRA_A },
-      update: {},
-      create: { id: QUADRA_A, name: "Quadra A - Society" },
+      // Atributos também no update pra aplicar nas quadras já existentes.
+      update: { name: "Quadra A - Society", sports: ["FUTEBOL", "FUTEVOLEI"], surface: "SINTETICO", pricePerHour: 12000 },
+      create: { id: QUADRA_A, name: "Quadra A - Society", sports: ["FUTEBOL", "FUTEVOLEI"], surface: "SINTETICO", pricePerHour: 12000 },
     }),
     prisma.resource.upsert({
       where: { id: QUADRA_B },
-      update: {},
-      create: { id: QUADRA_B, name: "Quadra B - Tênis" },
+      update: { name: "Quadra B - Areia", sports: ["BEACH_TENNIS", "VOLEI", "FUTEVOLEI"], surface: "AREIA", pricePerHour: 9000 },
+      create: { id: QUADRA_B, name: "Quadra B - Areia", sports: ["BEACH_TENNIS", "VOLEI", "FUTEVOLEI"], surface: "AREIA", pricePerHour: 9000 },
     }),
   ]);
 

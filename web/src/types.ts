@@ -9,6 +9,9 @@ export interface User {
 export interface Resource {
   id: string;
   name: string;
+  sports: string[]; // esportes aceitos (ex: ["FUTEBOL","FUTEVOLEI"])
+  surface: string; // tipo de piso (ex: "AREIA")
+  pricePerHour: number | null; // em centavos
 }
 
 export interface Slot {
@@ -38,6 +41,7 @@ export interface Booking {
   userId: string; // o DONO do jogo
   startsAt: string;
   endsAt: string;
+  sport: string | null; // esporte escolhido pra este jogo
   resource?: Resource;
   user?: User;
   participants?: Participant[];

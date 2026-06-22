@@ -211,6 +211,71 @@ header h1 {
   font-style: italic;
 }
 
+/* Info da quadra + caixa de esporte */
+.court-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+.court-meta {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.sport-box {
+  position: relative;
+}
+.sport-head {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sport-head b {
+  color: var(--text-h);
+}
+.sport-head .chev {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.sport-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.sport-chip {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sport-chip.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.sport-badge {
+  margin-left: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* Grade de horários */
 .slots {
   display: grid;

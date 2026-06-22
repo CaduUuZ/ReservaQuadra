@@ -56,6 +56,7 @@ interface SlotInput {
   resourceId: string;
   startsAt: string;
   endsAt: string;
+  sport?: string; // só usado na criação de reserva
 }
 
 export const api = {

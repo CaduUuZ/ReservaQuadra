@@ -57,6 +57,9 @@ erDiagram
     RESOURCES {
         uuid id PK
         string name
+        enum sports "esportes aceitos"
+        enum surface "tipo de piso"
+        int price_per_hour
     }
     BOOKINGS {
         uuid id PK
@@ -64,6 +67,7 @@ erDiagram
         uuid user_id FK
         timestamptz starts_at
         timestamptz ends_at
+        enum sport
     }
     PARTICIPANTS {
         uuid id PK
@@ -159,6 +163,10 @@ sequenceDiagram
 ```
 
 ---
+
+## 🏟️ Quadras & esportes
+
+Cada quadra declara os **esportes que aceita** (futebol, vôlei, tênis, beach tennis, futevôlei, basquete), o **tipo de piso** (areia, saibro, sintético…) e um **preço/hora** (informativo). Ao reservar, escolhe-se **um** esporte dentre os que a quadra aceita — o backend valida (400 se não aceito). Por ora os atributos vêm do seed; a edição pela própria quadra entra na fase de contas de empresa.
 
 ## 🎮 Jogos & convidados
 

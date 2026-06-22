@@ -13,6 +13,24 @@ const MONTHS = [
   "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
 ];
 
+const SPORT_LABELS: Record<string, string> = {
+  FUTEBOL: "⚽ Futebol",
+  VOLEI: "🏐 Vôlei",
+  TENIS: "🎾 Tênis",
+  BEACH_TENNIS: "🏖️ Beach tennis",
+  FUTEVOLEI: "🦶 Futevôlei",
+  BASQUETE: "🏀 Basquete",
+};
+const SURFACE_LABELS: Record<string, string> = {
+  AREIA: "Areia",
+  SAIBRO: "Saibro",
+  SINTETICO: "Sintético",
+  CIMENTO: "Cimento",
+  GRAMA: "Grama",
+};
+const fmtPrice = (cents: number | null) =>
+  cents == null ? "" : `R$ ${(cents / 100).toFixed(2).replace(".", ",")}/h`;
+
 const fmtTime = (iso: string) => iso.slice(11, 16);
 const fmtHour = (iso: string) => `${Number(iso.slice(11, 13))}h`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -45,6 +63,9 @@ export default function App() {
   const [toast, setToast] = useState<Toast>(null);
   // Horários livres selecionados (por startsAt) para reservar de uma vez.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Esporte escolhido pro próximo jogo (dentre os que a quadra aceita).
+  const [sport, setSport] = useState<string>("");
+  const [sportOpen, setSportOpen] = useState(false);
 
   const flash = (kind: NonNullable<Toast>["kind"], text: string) => {
     setToast({ kind, text });
@@ -85,6 +106,13 @@ export default function App() {
     setSelected(new Set());
   }, [resourceId, date]);
 
+  // Ao carregar/trocar a quadra, escolhe o 1º esporte aceito como padrão.
+  useEffect(() => {
+    const sports = availability?.resource.sports ?? [];
+    setSport(sports[0] ?? "");
+    setSportOpen(false);
+  }, [availability?.resource.id]);
+
   // Clicar num horário: livre -> (des)seleciona; ocupado -> entra na fila.
   const onSlotClick = async (slot: Slot) => {
     if (slot.available) {
@@ -122,7 +150,7 @@ export default function App() {
     }
 
     const results = await Promise.allSettled(
-      ranges.map((r) => api.createBooking({ resourceId, ...r })),
+      ranges.map((r) => api.createBooking({ resourceId, ...r, sport: sport || undefined })),
     );
     const ok = results.filter((r) => r.status === "fulfilled").length;
     const fail = results.length - ok;
@@ -194,6 +222,41 @@ export default function App() {
       <main className="grid">
         <section className="card">
           <h2>Disponibilidade <small>(UTC)</small></h2>
+
+          {availability?.resource && (
+            <div className="court-info">
+              <span className="court-meta">
+                🏟️ {SURFACE_LABELS[availability.resource.surface] ?? availability.resource.surface}
+                {availability.resource.pricePerHour != null &&
+                  ` · ${fmtPrice(availability.resource.pricePerHour)}`}
+              </span>
+              {availability.resource.sports.length > 0 && (
+                <div className="sport-box">
+                  <button className="sport-head" onClick={() => setSportOpen((v) => !v)}>
+                    Esporte: <b>{SPORT_LABELS[sport] ?? "—"}</b>
+                    <span className="chev">{sportOpen ? "▾" : "▸"}</span>
+                  </button>
+                  {sportOpen && (
+                    <div className="sport-chips">
+                      {availability.resource.sports.map((s) => (
+                        <button
+                          key={s}
+                          className={`sport-chip ${s === sport ? "active" : ""}`}
+                          onClick={() => {
+                            setSport(s);
+                            setSportOpen(false);
+                          }}
+                        >
+                          {SPORT_LABELS[s] ?? s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <p className="hint">Selecione um ou mais horários livres e confirme. Horários ocupados: clique pra entrar na fila.</p>
           <div className="slots">
             {availability?.slots.map((slot) => (
@@ -349,6 +412,7 @@ function BookingItem({
           <span>
             {fmtDayLabel(booking.startsAt)} · {fmtHour(booking.startsAt)}–{fmtHour(booking.endsAt)}
             {" · "}<b>{booking.user?.name ?? "—"}</b>
+            {booking.sport && <span className="sport-badge">{SPORT_LABELS[booking.sport] ?? booking.sport}</span>}
           </span>
           <span className="count">{parts.length} 👥</span>
         </button>
