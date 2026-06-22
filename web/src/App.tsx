@@ -5,10 +5,30 @@ import { useAuth } from "./auth/AuthContext";
 import { AuthPage } from "./components/AuthPage";
 import "./App.css";
 
-// Mostra a hora (UTC) de um ISO. O backend trabalha em UTC, então exibimos UTC
-// pra não confundir com o fuso do navegador.
+// Tudo em UTC (o backend trabalha em UTC), pra a data/hora exibida bater com os
+// horários da grade e não escorregar de dia pelo fuso do navegador.
+const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const MONTHS = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
+
 const fmtTime = (iso: string) => iso.slice(11, 16);
+const fmtHour = (iso: string) => `${Number(iso.slice(11, 13))}h`;
 const today = () => new Date().toISOString().slice(0, 10);
+
+// De um ISO datetime -> "Segunda, dia 22".
+const fmtDayLabel = (iso: string) => {
+  const d = new Date(iso);
+  return `${WEEKDAYS[d.getUTCDay()]}, dia ${d.getUTCDate()}`;
+};
+
+// Da string do seletor de data "2026-06-22" -> "Segunda, 22 de junho de 2026".
+const fmtSelectedDate = (dateStr: string) => {
+  const [y, m, day] = dateStr.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1, day));
+  return `${WEEKDAYS[d.getUTCDay()]}, ${day} de ${MONTHS[m - 1]} de ${y}`;
+};
 
 type Toast = { kind: "success" | "error" | "info"; text: string } | null;
 
@@ -128,6 +148,8 @@ export default function App() {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
       </div>
+
+      <p className="date-caption">🗓️ {fmtSelectedDate(date)}</p>
 
       <main className="grid">
         <section className="card">
@@ -275,7 +297,10 @@ function BookingItem({
       <div className="game-head">
         <button className="game-toggle" onClick={() => setOpen((v) => !v)}>
           <span className="chev">{open ? "▾" : "▸"}</span>
-          {fmtTime(booking.startsAt)}–{fmtTime(booking.endsAt)} · <b>{booking.user?.name ?? "—"}</b>
+          <span>
+            {fmtDayLabel(booking.startsAt)} · {fmtHour(booking.startsAt)}–{fmtHour(booking.endsAt)}
+            {" · "}<b>{booking.user?.name ?? "—"}</b>
+          </span>
           <span className="count">{parts.length} 👥</span>
         </button>
         {isOwner && <button className="ghost" onClick={onCancel}>cancelar</button>}
