@@ -200,6 +200,8 @@ JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). 
 
 Uma SPA em **React + Vite** (pasta [`web/`](web/)) dá uma visualização do sistema funcionando: **login/registro**, grade de disponibilidade por quadra/dia, criar e cancelar reservas, fila de espera com promoção automática, e um **botão que dispara N reservas simultâneas** mostrando ao vivo "1 criada + N-1 conflito".
 
+Dá pra **selecionar vários horários** e reservar de uma vez: blocos contíguos viram uma reserva só (10h+11h → 10h–12h), separados viram reservas distintas. As datas aparecem em formato amigável ("Segunda, dia 22 · 19h–20h").
+
 O token JWT é guardado no `localStorage` e enviado em cada requisição; a sessão é restaurada no reload via `GET /auth/me`. A API habilita CORS pra a SPA consumi-la. Conta demo: `cadu@reservaquadra.dev` / `senha123`.
 
 ## 🚀 Como rodar

@@ -43,6 +43,8 @@ export default function App() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [toast, setToast] = useState<Toast>(null);
+  // Horários livres selecionados (por startsAt) para reservar de uma vez.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const flash = (kind: NonNullable<Toast>["kind"], text: string) => {
     setToast({ kind, text });
@@ -78,22 +80,60 @@ export default function App() {
     refresh().catch(() => {});
   }, [refresh]);
 
-  // Clicar num horário: livre -> reserva; ocupado -> entra na fila.
+  // Trocar de quadra/data zera a seleção (horários são de outro contexto).
+  useEffect(() => {
+    setSelected(new Set());
+  }, [resourceId, date]);
+
+  // Clicar num horário: livre -> (des)seleciona; ocupado -> entra na fila.
   const onSlotClick = async (slot: Slot) => {
-    const payload = { resourceId, startsAt: slot.startsAt, endsAt: slot.endsAt };
+    if (slot.available) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(slot.startsAt)) next.delete(slot.startsAt);
+        else next.add(slot.startsAt);
+        return next;
+      });
+      return;
+    }
+    // Ocupado -> entra na fila (imediato).
     try {
-      if (slot.available) {
-        await api.createBooking(payload);
-        flash("success", `Reserva criada às ${fmtTime(slot.startsAt)} ✓`);
-      } else {
-        await api.joinWaitlist(payload);
-        flash("info", `Você entrou na fila das ${fmtTime(slot.startsAt)} 🎟️`);
-      }
+      await api.joinWaitlist({ resourceId, startsAt: slot.startsAt, endsAt: slot.endsAt });
+      flash("info", `Você entrou na fila das ${fmtTime(slot.startsAt)} 🎟️`);
       await refresh();
     } catch (e) {
       flash("error", e instanceof ApiError ? e.message : "Erro inesperado");
     }
   };
+
+  // Confirma a seleção: junta horários contíguos numa reserva só e cria cada bloco.
+  const confirmSelection = async () => {
+    const slots = (availability?.slots ?? [])
+      .filter((s) => selected.has(s.startsAt))
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    if (slots.length === 0) return;
+
+    // Agrupa contíguos: se um bloco termina onde o próximo começa, vira um só.
+    const ranges: { startsAt: string; endsAt: string }[] = [];
+    for (const s of slots) {
+      const last = ranges[ranges.length - 1];
+      if (last && last.endsAt === s.startsAt) last.endsAt = s.endsAt;
+      else ranges.push({ startsAt: s.startsAt, endsAt: s.endsAt });
+    }
+
+    const results = await Promise.allSettled(
+      ranges.map((r) => api.createBooking({ resourceId, ...r })),
+    );
+    const ok = results.filter((r) => r.status === "fulfilled").length;
+    const fail = results.length - ok;
+
+    setSelected(new Set());
+    await refresh();
+    if (fail === 0) flash("success", `${ok} reserva(s) criada(s) ✓`);
+    else flash("error", `${ok} criada(s), ${fail} em conflito`);
+  };
+
+  const clearSelection = () => setSelected(new Set());
 
   const onCancel = async (booking: Booking) => {
     try {
@@ -154,19 +194,28 @@ export default function App() {
       <main className="grid">
         <section className="card">
           <h2>Disponibilidade <small>(UTC)</small></h2>
-          <p className="hint">Clique num horário livre pra reservar, ou num ocupado pra entrar na fila.</p>
+          <p className="hint">Selecione um ou mais horários livres e confirme. Horários ocupados: clique pra entrar na fila.</p>
           <div className="slots">
             {availability?.slots.map((slot) => (
               <button
                 key={slot.startsAt}
-                className={`slot ${slot.available ? "free" : "busy"}`}
+                className={`slot ${slot.available ? "free" : "busy"} ${selected.has(slot.startsAt) ? "selected" : ""}`}
                 onClick={() => onSlotClick(slot)}
-                title={slot.available ? "Livre — clique pra reservar" : "Ocupado — clique pra entrar na fila"}
+                title={slot.available ? "Livre — clique pra selecionar" : "Ocupado — clique pra entrar na fila"}
               >
                 {fmtTime(slot.startsAt)}
               </button>
             ))}
           </div>
+          {selected.size > 0 && (
+            <div className="select-bar">
+              <span>{selected.size} horário(s) selecionado(s)</span>
+              <button className="clear" onClick={clearSelection}>limpar</button>
+              <button className="confirm" onClick={confirmSelection}>
+                reservar {selected.size}
+              </button>
+            </div>
+          )}
         </section>
 
         <section className="card">
