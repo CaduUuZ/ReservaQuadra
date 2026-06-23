@@ -64,3 +64,12 @@ export interface CancelResult {
   cancelled: string;
   promoted: Booking | null;
 }
+
+export interface Message {
+  id: string;
+  bookingId: string;
+  userId: string;
+  text: string;
+  createdAt: string;
+  user?: { id: string; name: string };
+}

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api, tokenStore } from "../api";
+import { resetSocket } from "../socket";
 import type { User } from "../types";
 
 interface AuthValue {
@@ -32,17 +33,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const { token, user } = await api.login({ email, password });
     tokenStore.set(token);
+    resetSocket(); // reconecta o chat com o token novo
     setUser(user);
   };
 
   const register = async (name: string, email: string, password: string, role: string) => {
     const { token, user } = await api.register({ name, email, password, role });
     tokenStore.set(token);
+    resetSocket();
     setUser(user);
   };
 
   const logout = () => {
     tokenStore.clear();
+    resetSocket();
     setUser(null);
   };
 

@@ -46,7 +46,9 @@ erDiagram
     USERS ||--o{ WAITLIST_ENTRIES : aguarda
     RESOURCES ||--o{ WAITLIST_ENTRIES : tem
     BOOKINGS ||--o{ PARTICIPANTS : tem
+    BOOKINGS ||--o{ MESSAGES : chat
     USERS |o--o{ PARTICIPANTS : "joga (opcional)"
+    USERS ||--o{ MESSAGES : envia
     USERS |o--o{ RESOURCES : "é dona (empresa)"
 
     USERS {
@@ -86,6 +88,13 @@ erDiagram
         timestamptz starts_at
         timestamptz ends_at
         enum status
+    }
+    MESSAGES {
+        uuid id PK
+        uuid booking_id FK
+        uuid user_id FK
+        string text
+        timestamptz created_at
     }
 ```
 
@@ -179,6 +188,10 @@ Uma reserva é um **jogo**: tem um **dono** (logado, responde pela quadra) e uma
 
 O dono pode **sortear** os participantes em 2 a 4 times. O algoritmo embaralha (Fisher-Yates) e distribui em rodízio, então os times ficam equilibrados (tamanhos diferindo no máximo em 1). A escalação é persistida (campo `team`) e numa transação — todos recebem time ou ninguém. Dá pra re-sortear ou limpar.
 
+## 💬 Chat em tempo real
+
+Cada jogo tem um **chat** entre os participantes cadastrados, via **Socket.IO**. A conexão é autenticada com o mesmo JWT (no handshake); há uma sala por jogo, e só membros (dono ou participante) entram, leem e enviam — a checagem de permissão é feita no servidor a cada mensagem. O histórico é persistido (`GET /bookings/:id/messages`) e o tempo real roda sobre a mesma porta da API.
+
 ## 🔐 Autenticação
 
 JWT (Bearer token). Senhas guardadas com hash **bcrypt** (nunca em texto puro). No login/registro a API devolve um token; o cliente o envia no header `Authorization: Bearer <token>`. As rotas de reserva/fila são protegidas, e o `userId` vem **do token** — ninguém reserva em nome de outro. Cancelamento exige ser o **dono** da reserva (403 caso contrário).
@@ -205,6 +218,9 @@ Há dois tipos de conta (`role` no token): **JOGADOR** e **EMPRESA**. Empresas c
 | `DELETE` | `/bookings/:id/participants/:pid` | 🔒 | Remove participante (só o dono) |
 | `POST` | `/bookings/:id/teams/randomize` | 🔒 | Sorteia os participantes em N times (2–4) |
 | `DELETE` | `/bookings/:id/teams` | 🔒 | Desfaz a escalação |
+| `GET` | `/bookings/:id/messages` | 🔒 | Histórico do chat (só membros) |
+
+Tempo real (Socket.IO, mesma porta): eventos `join`/`leave` (sala do jogo) e `message` (enviar/receber).
 | `POST` | `/waitlist` | 🔒 | Entra na fila de um horário |
 | `GET` | `/waitlist?resourceId=` | 🔒 | Lista a fila com posição |
 | `DELETE` | `/waitlist/:id` | 🔒 | Sai da fila |
@@ -274,6 +290,7 @@ npm test
 - **PostgreSQL 16** — pela _exclusion constraint_ + `tstzrange`, que tornam o projeto possível.
 - **Prisma 7** — ORM tipado; a constraint entra via migration SQL manual (o Prisma não a expressa nativamente).
 - **Express 5 + Zod 4** — API enxuta com validação declarativa.
+- **Socket.IO** — chat em tempo real (autenticado por JWT, sala por jogo).
 - **pino** — logs estruturados (JSON) com id de requisição.
 - **Docker Compose** — banco reproduzível com um comando.
 

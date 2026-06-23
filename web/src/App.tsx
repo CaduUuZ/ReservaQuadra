@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "./api";
-import type { Availability, Booking, Resource, Slot, WaitlistEntry } from "./types";
+import { getSocket } from "./socket";
+import type { Availability, Booking, Message, Resource, Slot, WaitlistEntry } from "./types";
 import { useAuth } from "./auth/AuthContext";
 import { AuthPage } from "./components/AuthPage";
 import "./App.css";
@@ -596,6 +597,42 @@ function BookingItem({
   const [guest, setGuest] = useState("");
   const isOwner = booking.userId === currentUserId;
   const parts = booking.participants ?? [];
+  // Só quem participa do jogo (dono ou participante cadastrado) tem chat.
+  const isMember = isOwner || parts.some((p) => p.userId === currentUserId);
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatText, setChatText] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Ao abrir o card (sendo membro): carrega histórico, entra na sala e escuta.
+  useEffect(() => {
+    if (!open || !isMember) return;
+    let active = true;
+    api.getMessages(booking.id).then((m) => active && setMessages(m)).catch(() => {});
+    const socket = getSocket();
+    socket.emit("join", booking.id);
+    const onMessage = (m: Message) => {
+      if (m.bookingId === booking.id) setMessages((prev) => [...prev, m]);
+    };
+    socket.on("message", onMessage);
+    return () => {
+      active = false;
+      socket.emit("leave", booking.id);
+      socket.off("message", onMessage);
+    };
+  }, [open, isMember, booking.id]);
+
+  // Rola pro fim quando chega mensagem.
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessage = () => {
+    const text = chatText.trim();
+    if (!text) return;
+    getSocket().emit("message", { bookingId: booking.id, text });
+    setChatText(""); // a própria mensagem volta pelo broadcast e é exibida
+  };
 
   const addGuest = async () => {
     const name = guest.trim();
@@ -713,6 +750,34 @@ function BookingItem({
                 </div>
               )}
             </>
+          )}
+
+          {isMember && (
+            <div className="chat">
+              <h4>💬 Chat do jogo</h4>
+              <div className="chat-msgs">
+                {messages.length === 0 && <p className="empty">Sem mensagens ainda.</p>}
+                {messages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`msg ${m.userId === currentUserId ? "mine" : ""}`}
+                  >
+                    <span className="who">{m.user?.name ?? "—"}</span>
+                    <span className="bubble">{m.text}</span>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              <div className="chat-input">
+                <input
+                  placeholder="escreva uma mensagem…"
+                  value={chatText}
+                  onChange={(e) => setChatText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                />
+                <button onClick={sendMessage}>enviar</button>
+              </div>
+            </div>
           )}
         </div>
       )}

@@ -28,6 +28,7 @@ model User {
   waitlist  WaitlistEntry[]
   participations Participant[] // jogos dos quais participa (como usuário cadastrado)
   ownedResources Resource[] // quadras que esta EMPRESA possui
+  messages  Message[] // mensagens enviadas no chat dos jogos
 
   @@map("users")
 }
@@ -112,9 +113,24 @@ model Booking {
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   // O "user/userId" acima é o DONO do jogo. Os jogadores (incl. o dono) ficam aqui.
   participants Participant[]
+  messages     Message[] // chat do jogo
 
   @@index([resourceId])
   @@map("bookings")
+}
+
+// Mensagem do chat de um jogo. O chat é por reserva; histórico persistido aqui.
+model Message {
+  id        String   @id @default(uuid()) @db.Uuid
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId String   @map("booking_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id") @db.Uuid
+  text      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([bookingId, createdAt])
+  @@map("messages")
 }
 
 // Um participante de um jogo (reserva). É um usuário cadastrado (userId) OU um

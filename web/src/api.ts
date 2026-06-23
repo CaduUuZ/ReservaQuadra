@@ -3,6 +3,7 @@ import type {
   Availability,
   Booking,
   CancelResult,
+  Message,
   Participant,
   Resource,
   User,
@@ -111,6 +112,10 @@ export const api = {
     request<void>(`/bookings/${bookingId}/participants/${participantId}`, {
       method: "DELETE",
     }),
+
+  // --- Chat (histórico; o tempo real é via Socket.IO) ---
+  getMessages: (bookingId: string) =>
+    request<Message[]>(`/bookings/${bookingId}/messages`),
 
   // --- Times ---
   randomizeTeams: (bookingId: string, teams: number) =>

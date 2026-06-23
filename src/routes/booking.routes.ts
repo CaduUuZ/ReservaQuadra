@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as bookingController from "../controllers/booking.controller.js";
 import * as participantController from "../controllers/participant.controller.js";
+import * as chatController from "../controllers/chat.controller.js";
 
 export const bookingRouter = Router();
 
@@ -15,3 +16,6 @@ bookingRouter.delete("/:id/participants/:participantId", participantController.r
 // Times (sortear / limpar) — só o dono.
 bookingRouter.post("/:id/teams/randomize", participantController.randomizeTeams);
 bookingRouter.delete("/:id/teams", participantController.clearTeams);
+
+// Histórico do chat do jogo (só membros).
+bookingRouter.get("/:id/messages", chatController.list);
